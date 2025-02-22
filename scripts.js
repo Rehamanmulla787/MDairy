@@ -1,13 +1,38 @@
 
-const farmerSelect = document.getElementById("farmerName");
-const farmers = ["John Doe", "Alice Smith", "Bob Johnson", "Charlie Brown", "David White", "Emma Green", "Frank Black", "Grace Miller", "Henry Wilson", "Ivy Adams", "Jack Taylor"];
+document.addEventListener("DOMContentLoaded", function () {
+    const farmerList = document.getElementById("farmerList");
+    const farmerInput = document.getElementById("farmerName");
 
-farmers.forEach(farmer => {
-    const option = document.createElement("option");
-    option.value = farmer;
-    option.textContent = farmer;
-    farmerSelect.appendChild(option);
+    // Example farmers (Replace this with real data from Firebase if needed)
+    const farmers = ["John Doe", "Alice Smith", "Bob Johnson", "Charlie Brown", "David White", "Emma Green"];
+
+    // Load farmers into datalist
+    function loadFarmers() {
+        farmerList.innerHTML = ""; // Clear previous options
+        farmers.forEach(farmer => {
+            const option = document.createElement("option");
+            option.value = farmer;
+            farmerList.appendChild(option);
+        });
+    }
+
+    loadFarmers(); // Populate the list on page load
+
+    // Event: Show filtered suggestions while typing
+    farmerInput.addEventListener("input", function () {
+        const inputValue = this.value.toLowerCase();
+        farmerList.innerHTML = ""; // Clear previous options
+
+        farmers.forEach(farmer => {
+            if (farmer.toLowerCase().includes(inputValue)) {
+                const option = document.createElement("option");
+                option.value = farmer;
+                farmerList.appendChild(option);
+            }
+        });
+    });
 });
+
 
 document.getElementById("billDate").addEventListener("change", generatePreviousDates);
 
