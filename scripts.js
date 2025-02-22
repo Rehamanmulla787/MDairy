@@ -1,13 +1,13 @@
 
-    const farmerSelect = document.getElementById("farmerName");
-    const farmers = ["John Doe", "Alice Smith", "Bob Johnson", "Charlie Brown", "David White", "Emma Green", "Frank Black", "Grace Miller", "Henry Wilson", "Ivy Adams", "Jack Taylor"];
+const farmerSelect = document.getElementById("farmerName");
+const farmers = ["John Doe", "Alice Smith", "Bob Johnson", "Charlie Brown", "David White", "Emma Green", "Frank Black", "Grace Miller", "Henry Wilson", "Ivy Adams", "Jack Taylor"];
 
-    farmers.forEach(farmer => {
-        const option = document.createElement("option");
-        option.value = farmer;
-        option.textContent = farmer;
-        farmerSelect.appendChild(option);
-    });
+farmers.forEach(farmer => {
+    const option = document.createElement("option");
+    option.value = farmer;
+    option.textContent = farmer;
+    farmerSelect.appendChild(option);
+});
 
 document.getElementById("billDate").addEventListener("change", generatePreviousDates);
 
