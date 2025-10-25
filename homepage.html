@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mulla Dairy: Management Dashboard</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use Inter font family -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa; /* Light background for freshness */
+        }
+        /* Custom styles for professional buttons */
+        .action-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .icon-circle {
+            width: 60px;
+            height: 60px;
+        }
+    </style>
+</head>
+<body class="min-h-screen antialiased">
+
+    <!-- Main Application Container -->
+    <div class="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- Header -->
+        <header class="flex justify-between items-center py-4 border-b border-gray-200">
+            <div class="flex items-center space-x-3">
+                <!-- Dairy Icon (Simple SVG) -->
+                <svg class="w-8 h-8 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                <!-- UPDATED: Mulla Dairy Name -->
+                <h1 class="text-3xl font-extrabold text-gray-800">
+                    <span class="text-sky-600">MullaDairy</span>  Dashboard
+                </h1>
+            </div>
+            <button id="openRateModal" class="bg-emerald-500 hover:bg-emerald-600 text-white font-semibold py-2 px-4 rounded-lg shadow-md transition duration-150 ease-in-out flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                Set Milk Rates
+            </button>
+        </header>
+
+        <!-- Hero Section -->
+        <div class="text-center py-12 lg:py-16 bg-white my-6 rounded-xl shadow-lg border border-gray-100">
+            <span class="text-xs font-medium uppercase tracking-widest text-sky-500 bg-sky-100 px-3 py-1 rounded-full">Billing Automation</span>
+            <h2 class="mt-4 text-4xl sm:text-5xl font-extrabold text-gray-900 leading-tight">
+                Generate Instant Milk Bills
+            </h2>
+            <p class="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+                Select the milk type below to instantly generate the bill based on pre-set rates and quality parameters. Efficiency starts here.
+            </p>
+        </div>
+
+        <!-- Action Buttons Section -->
+        <section class="mt-10">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6">Quick Actions</h3>
+            <div class="grid md:grid-cols-2 gap-8">
+
+                <!-- Buffalo Milk Card -->
+                <div class="action-card bg-white p-6 rounded-xl shadow-xl border-l-4 border-amber-600 flex items-start space-x-4">
+                    <div class="icon-circle bg-amber-100 text-amber-600 rounded-full flex items-center justify-center shadow-inner">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c1.657 0 3 .895 3 2s-1.343 2-3 2v5l-4-4 4-4zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-bold text-gray-900">Buffalo Milk Billing</h4>
+                        <p class="mt-1 text-gray-600 text-sm">Initiate the process to generate a new collection bill for Buffalo Milk based on FAT/SNF data.</p>
+                        <!-- Added ID for click handler -->
+                        <button id="generateBuffaloBillBtn" class="mt-3 bg-amber-600 hover:bg-amber-700 text-white font-medium py-2 px-5 rounded-full shadow-lg transition duration-150 ease-in-out">
+                            Generate Buffalo Bill
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cow Milk Card -->
+                <div class="action-card bg-white p-6 rounded-xl shadow-xl border-l-4 border-sky-600 flex items-start space-x-4">
+                    <div class="icon-circle bg-sky-100 text-sky-600 rounded-full flex items-center justify-center shadow-inner">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.5C10.619 6.5 9.5 7.619 9.5 9s1.119 2.5 2.5 2.5 2.5-1.119 2.5-2.5-1.119-2.5-2.5-2.5zm0 0v-4M8 17h8m-4-2v4M5 19h14M3 7l2-2h14l2 2"></path></svg>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-bold text-gray-900">Cow Milk Billing</h4>
+                        <p class="mt-1 text-gray-600 text-sm">Start the quick billing procedure for Cow Milk collections using current rates.</p>
+                        <!-- Added ID for click handler -->
+                        <button id="generateCowBillBtn" class="mt-3 bg-sky-600 hover:bg-sky-700 text-white font-medium py-2 px-5 rounded-full shadow-lg transition duration-150 ease-in-out">
+                            Generate Cow Bill
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- Dashboard / Key Features Section -->
+        <section class="mt-12">
+            <h3 class="text-2xl font-bold text-gray-800 mb-6">System Overview</h3>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Card 1 -->
+                <div class="bg-white p-5 rounded-xl shadow-lg flex items-center space-x-3">
+                    <div class="icon-circle bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl font-extrabold">
+                        +
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Total Farmers</p>
+                        <p class="text-2xl font-bold text-gray-900">125</p>
+                    </div>
+                </div>
+                <!-- Card 2 -->
+                <div class="bg-white p-5 rounded-xl shadow-lg flex items-center space-x-3">
+                    <div class="icon-circle bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl font-extrabold">
+                        L
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Today's Volume</p>
+                        <p class="text-2xl font-bold text-gray-900">1,450 <span class="text-base font-normal">Litres</span></p>
+                    </div>
+                </div>
+                <!-- Card 3 -->
+                <div class="bg-white p-5 rounded-xl shadow-lg flex items-center space-x-3">
+                    <div class="icon-circle bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl font-extrabold">
+                        %
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Quality Average</p>
+                        <p class="text-2xl font-bold text-gray-900">7.2 <span class="text-base font-normal">FAT</span></p>
+                    </div>
+                </div>
+                <!-- Card 4 -->
+                <div class="bg-white p-5 rounded-xl shadow-lg flex items-center space-x-3">
+                    <div class="icon-circle bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-xl font-extrabold">
+                        $
+                    </div>
+                    <div>
+                        <p class="text-sm font-medium text-gray-500">Billing Pending</p>
+                        <p class="text-2xl font-bold text-gray-900">4 <span class="text-base font-normal">Days</span></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Message Box for Alerts (Replaces alert()) -->
+        <div id="messageBox" class="fixed top-4 right-4 z-50 transition-transform duration-300 transform translate-x-full">
+            <!-- Message content will be inserted here -->
+        </div>
+
+    </div>
+
+    <!-- Rate Setting Modal -->
+    <div id="rateModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 hidden items-center justify-center z-50 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md mx-4">
+            <h4 class="text-2xl font-bold text-gray-900 border-b pb-3 mb-4">Set Current Milk Rates</h4>
+            <div class="space-y-4">
+                
+                <!-- Buffalo Milk Rate Input -->
+                <div>
+                    <label for="buffaloRate" class="block text-sm font-medium text-gray-700">Buffalo Milk Rate (₹/Liter)</label>
+                    <input type="number" id="buffaloRate" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-amber-500 focus:ring-amber-500 text-lg p-2.5" placeholder="e.g., 65.00">
+                </div>
+
+                <!-- Cow Milk Rate Input -->
+                <div>
+                    <label for="cowRate" class="block text-sm font-medium text-gray-700">Cow Milk Rate (₹/Liter)</label>
+                    <input type="number" id="cowRate" class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-sky-500 focus:ring-sky-500 text-lg p-2.5" placeholder="e.g., 45.00">
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end space-x-3">
+                <button id="closeRateModal" class="px-4 py-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition duration-150">
+                    Cancel
+                </button>
+                <button id="saveRates" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-medium shadow-md transition duration-150">
+                    Save Rates
+                </button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // --- Application Setup (Plain JS/CSS/HTML) ---
+
+        // Application Logic
+        const generateBuffaloBillBtn = document.getElementById('generateBuffaloBillBtn');
+        const generateCowBillBtn = document.getElementById('generateCowBillBtn');
+        const messageBox = document.getElementById('messageBox');
+        
+        const rateModal = document.getElementById('rateModal');
+        const openRateModal = document.getElementById('openRateModal');
+        const closeRateModal = document.getElementById('closeRateModal');
+        const saveRates = document.getElementById('saveRates');
+        const buffaloRateInput = document.getElementById('buffaloRate');
+        const cowRateInput = document.getElementById('cowRate');
+
+        let rates = {
+            buffalo: 65.00, // Default rate
+            cow: 45.00      // Default rate
+        };
+
+        // --- Utility Functions ---
+
+        // Function to display messages (replaces alert())
+        function showMessage(type, title, message) {
+            const color = type === 'success' ? 'bg-green-500' : (type === 'error' ? 'bg-red-500' : 'bg-blue-500');
+            const html = `
+                <div class="max-w-xs ${color} text-white p-4 rounded-lg shadow-xl mb-4 transition-opacity duration-300" role="alert">
+                    <p class="font-bold">${title}</p>
+                    <p class="text-sm">${message}</p>
+                </div>
+            `;
+
+            messageBox.insertAdjacentHTML('beforeend', html);
+            const alertElement = messageBox.lastElementChild;
+
+            // Show the alert
+            setTimeout(() => {
+                alertElement.classList.remove('translate-x-full');
+            }, 50); 
+
+            // Hide the alert after 4 seconds
+            setTimeout(() => {
+                alertElement.classList.add('opacity-0');
+                // Remove the element after transition completes
+                setTimeout(() => {
+                    alertElement.remove();
+                }, 300);
+            }, 4000);
+        }
+
+        // Load rates from localStorage or use defaults
+        function loadRates() {
+            const storedRates = localStorage.getItem('milkRates');
+            if (storedRates) {
+                try {
+                    rates = JSON.parse(storedRates);
+                } catch (e) {
+                    console.error("Error parsing rates from localStorage:", e);
+                }
+            }
+            // Update modal inputs with current rates
+            buffaloRateInput.value = rates.buffalo;
+            cowRateInput.value = rates.cow;
+        }
+
+        // Save rates to localStorage
+        function saveRatesToStorage() {
+            const newBuffaloRate = parseFloat(buffaloRateInput.value);
+            const newCowRate = parseFloat(cowRateInput.value);
+
+            if (isNaN(newBuffaloRate) || isNaN(newCowRate) || newBuffaloRate <= 0 || newCowRate <= 0) {
+                 showMessage('error', 'Error', 'Please enter valid, positive numbers for both rates.');
+                 return;
+            }
+
+            rates.buffalo = newBuffaloRate;
+            rates.cow = newCowRate;
+
+            localStorage.setItem('milkRates', JSON.stringify(rates));
+            showMessage('success', 'Rates Saved', `Buffalo: ₹${rates.buffalo.toFixed(2)}, Cow: ₹${rates.cow.toFixed(2)}`);
+            rateModal.classList.add('hidden');
+            rateModal.classList.remove('flex');
+        }
+
+        // --- Event Listeners ---
+
+        if (generateBuffaloBillBtn) {
+            generateBuffaloBillBtn.addEventListener('click', () => {
+                // Direct navigation to the billing page
+                window.location.href = 'buffalo_billing_page.html';
+            });
+        }
+        
+        if (generateCowBillBtn) {
+            generateCowBillBtn.addEventListener('click', () => {
+                // Direct navigation to the billing page
+                window.location.href = 'cow_billing_page.html';
+            });
+        }
+
+        // Modal Open/Close Logic
+        openRateModal.addEventListener('click', () => {
+            loadRates(); // Reload rates just before opening
+            rateModal.classList.remove('hidden');
+            rateModal.classList.add('flex');
+        });
+
+        closeRateModal.addEventListener('click', () => {
+            rateModal.classList.add('hidden');
+            rateModal.classList.remove('flex');
+        });
+
+        saveRates.addEventListener('click', saveRatesToStorage);
+        
+        // Close modal when clicking outside
+        rateModal.addEventListener('click', (e) => {
+            if (e.target === rateModal) {
+                rateModal.classList.add('hidden');
+                rateModal.classList.remove('flex');
+            }
+        });
+
+        // Initialize on window load
+        window.onload = function() {
+            loadRates();
+        }
+
+    </script>
+</body>
+</html>
