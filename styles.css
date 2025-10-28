@@ -1,9 +1,18 @@
-/* Existing styles for on-screen presentation */
+/* ---------------------------------------------------------------------- */
+/* --- EXISTING STYLES FOR ON-SCREEN PRESENTATION AND DARK MODE --- */
+/* ---------------------------------------------------------------------- */
+
+/* Hides the default number spin buttons in webkit browsers */
 input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
 }
+input[type="number"] {
+    appearance: textfield; /* Hides spin buttons in Firefox */
+}
+
+/* Dark Mode Styles */
 .dark-mode input[type="date"]::-webkit-calendar-picker-indicator {
     filter: invert(1);
 }
@@ -81,9 +90,7 @@ input[type="number"]::-webkit-inner-spin-button {
     border: 2px solid black;
 }
 
-input[type="number"] {
-    appearance: textfield;
-}
+
 .nav {
     display: flex;
     align-items: center;
@@ -120,7 +127,7 @@ img{
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     max-width: 80%;
-    box-shadow: 0px 0px 15px 5px rgba(0, 0, 0, 0.3);    
+    box-shadow: 0px 0px 15px 5px rgba(0, 0, 0, 0.3);        
 }
 
 .table {
@@ -180,6 +187,7 @@ img{
     color: #718096;
 }
 
+/* Loader/Spinner styles */
 .loader, .spinner {
     display: none;
     position: fixed;
@@ -225,53 +233,89 @@ img{
     padding-left: 2px;
 }
 
-/* Print-specific styles */
-/* ==================================== */
-/* === PRINT-SPECIFIC STYLES START === */
-/* ==================================== */
+/* ---------------------------------------------------------------------- */
+/* === PRINT-SPECIFIC STYLES START - FOR CLEAR PRINTING === */
+/* ---------------------------------------------------------------------- */
 
 @media print {
-    /* 1. REQUIRED RULE TO HIDE "GENERATOR" */
-    .hide-on-print {
-        display: none !important;
-    }
     
-    /* --- 1. HIDE Non-Essential Elements and Input Boxes --- */
+    /* 1. HIDE Non-Essential Elements and Input Boxes (Crucial for clean print) */
+    .hide-on-print,
     .dark-mode-toggle,
     .controls button,
-    /* HIDE the actual input fields for date and farmer name (the "boxes") */
     .billDate,
     .farmerName,
     .table input,
-    .input, /* Hides all other dynamic inputs like rate/quantity inputs */
-    #farmerList, /* Hides the datalist/dropdown */
+    .input, 
+    #farmerList,
     .loader, .spinner, .spinner-overlay,
     .signature-label:not(#signature)
     {
         display: none !important;
     }
     
-    /* --- 2. BASE LAYOUT RESET (For white paper) --- */
+    /* 2. BASE LAYOUT RESET (For white paper) */
     body {
         background-color: white !important;
         color: black !important;
+        /* Set margins to 0 to maximize printable area */
         margin: 0;
         padding: 0;
-        min-width: 320px; 
         font-size: 10pt;
-        display: block; 
     }
 
-    /* Target the main container to remove screen styling and borders */
+    /* Remove shadows, background, and borders from the main container */
     .container {
         width: 100%;
         max-width: 100%;
         box-shadow: none !important;
         background-color: transparent !important;
-        padding: 10mm 5mm;
+        /* Reduced padding for maximum space: 5mm top/bottom, 2mm sides */
+        padding: 0mm 2mm; 
         margin-top: 0;
         border: none !important; 
         border-radius: 0 !important;
+    }
+        .bill-date input,
+    .bill-date span {
+        font-weight: 700 !important;
+        color: black !important;
+    }
+
+    /* Farmer Name value */
+    .farmer-name input,
+    .farmer-name span {
+        font-weight: 700 !important;
+        color: black !important;
+    }
+
+    /* Balance value */
+    #balance {
+        font-weight: 700 !important;
+        color: black !important;
+    }
+        /* Balance text and number */
+    .balance, 
+    .balance span,
+    #balance {
+        font-weight: 700 !important;
+        color: black !important;
+    }
+
+    /* Owner Name text and value */
+    .owner-name,
+    .owner-name span,
+    .ownername {
+        font-weight: 700 !important;
+        color: black !important;
+    }
+
+    /* Mobile Number text and value */
+    .mobile-number,
+    .mobile-number span,
+    .ownernumber {
+        font-weight: 700 !important;
+        color: black !important;
     }
 
     /* Force all text/elements to print black/white, overriding dark mode */
@@ -282,86 +326,110 @@ img{
     .table th, .table td {
         color: black !important;
         background-color: white !important;
-        
-        
     }
     
     .mulla-dairy {
         font-size: 2rem;
         font-weight: bold;
     }
-
-    /* --- 3. FARMER/BILL DETAILS (Plain Text Display) --- */
-    .farmer-details {
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 15px;
-        padding-bottom: 5px;
-        /* REMOVES ALL BORDERS/BOXES around the details section */
-        border: none !important; 
-    }
     
-    .farmer-details .detail {
-        display: flex;
-        justify-content: space-between;
-        font-size: 11pt;
-        padding: 0;
-        margin: 0;
-        border: none !important; /* Ensure individual detail rows have no borders */
-    }
-    
-    /* Show the Farmer Name as text (Requires HTML/JS update below) */
-    #farmerNameDisplay {
-        display: block !important;
-        font-weight: bold;
-        border: none !important; 
-    }
-
-    /* Ensure labels (like the date label) are bold and black */
-    .bill-date label, .farmer-name label, .farmer-details label {
-        font-weight: bold;
+    /* Headers (Morning/Evening) should be bold but not over-bold */
+    h3, h4 {
+        font-weight: 700 !important;
         color: black !important;
     }
 
-    /* --- 4. TABLE AND DATA FORMATTING --- */
-  .table input {
-      border: none !important;
-      background: transparent !important;
-      color: black !important;
-      text-align: right;
-      width: 100%;
-      font-size: 9pt;
-      /* Keep inputs visible, but remove all borders/boxes */
-      -webkit-appearance: none;
-      appearance: none;
-  }
 
-  /* Optional: make empty cells look clean */
-  .table input:empty::after {
-      content: "";
-  }
-
-  /* For extra safety: prevent unwanted backgrounds */
-  .table td {
-      background-color: white !important;
-      color: black !important;
-  }
-
-  /* Remove box shadows and borders around table */
-  .table {
-      border-collapse: collapse;
-      box-shadow: none !important;
-  }
-
-  .table th, 
-  .table td {
-      border: 1px solid black !important;
-      padding: 4px 6px;
+    /* 3. FARMER/BILL DETAILS (Plain Text Display) */
+    .farmer-details {
+        border: none !important; 
     }
     
-
+    /* Make the dates and text in the detail area bold (700) */
+    .farmer-details .detail,
+    .farmer-details {
+        font-size: 11pt;
+        border: none !important;
+        /* VALUES: Bill Date and Farmer Name VALUE bolding */
+        font-weight: 700 !important; 
+    }
     
-    /* --- 5. TOTALS AND SIGNATURE --- */
+    #farmerNameDisplay {
+        display: block !important;
+        font-weight: 700 !important;
+        border: none !important; 
+    }
+
+    .bill-date label, .farmer-name label, .farmer-details label {
+        /* LABELS: Now setting these to 700 to match the user's request for BOLDER labels */
+        font-weight: 700 !important; 
+        color: black !important;
+    }
+
+    /* ---------------------------------------------------- */
+    /* --- 4. TABLE BORDERS AND BOLD NUMBERS (REQUESTED)--- */
+    /* ---------------------------------------------------- */
+    
+    /* BOLDER BORDERS: Applied to the table and all cells (2px solid black) */
+    .table {
+        border-collapse: collapse;
+        box-shadow: none !important;
+        /* Thicker border for the entire table container */
+        border: 2px solid black !important; 
+    }
+    .bill-date{
+        font-weight: 400 !important;
+    }
+    .table th, 
+    .table td {
+        /* Thicker internal cell borders */
+        border: 2px solid black !important; 
+        padding: 4px 6px;
+    }
+    
+    /* Table Headers (Date, Litres, Fat, SNF, Amount) - make bold */
+    .table th {
+        font-weight: 700 !important;
+    }
+    
+    /* Make the date column in the table bold (700) */
+    .table td:first-child {
+        font-weight: 700 !important; /* Bold for all dates in the table */
+        color: black !important;
+    }
+
+    /* BOLDER NUMBERS: Targets the spans created by the JS that hold the data (Litres, Fat, SNF, Amount) (700) */
+    .table td > span {
+        font-weight: 700 !important; /* Bold for Litres, Fat, SNF, and Amount data */
+        color: black !important; 
+        display: block; 
+        text-align: center;
+    }
+    
+    /* BOLDER NUMBERS: Target all Total Amount cells and final summary (700 for consistent, visible bolding) */
+    #morningTotalLitres, #morningTotalAmount,
+    #eveningTotalLitres, #eveningTotalAmount,
+    #totalLitres, #totalAmount,
+    .total-amount-morning, .total-amount-evening,
+    /* All numeric values in the summary area */
+    .totals-section span, 
+    .signature span
+    {
+        font-weight: 700 !important; /* Consistent, clear bolding across all important print text/numbers */
+        color: black !important;
+    }
+    
+    /* Ensure the labels in the totals section are also visible (Balance, Total Litres, etc.) 
+       Set to 700 to make the Balance label as bold as the value, as requested. */
+    .totals-section label, 
+    .signature label {
+        font-weight: 700 !important;
+        color: black !important;
+    }
+    
+    /* ---------------------------------------------------- */
+
+    /* 5. TOTALS AND SIGNATURE */
     .totals-section {
         border-top: 1px solid black;
         margin-top: 10px;
@@ -381,23 +449,16 @@ img{
         text-align: center;
         font-size: 10pt;
     }
-    button {
-        display: none !important;
-    }
-
-    /* 2. Target any element with a 'control-button' class, based on your original CSS */
-    .control-button {
-        display: none !important;
-    }
-
-    /* 3. Target any specific button containers or common non-printing elements */
-    .dark-mode-toggle,
-    .controls, /* If your buttons are inside a div with class 'controls' */
-    .no-print { /* A standard class often used to hide things */
+    
+    /* Hide all other control buttons */
+    button,
+    .control-button,
+    .controls,
+    .no-print {
         display: none !important;
     }
 }
 
-/* ==================================== */
+/* ---------------------------------------------------------------------- */
 /* === PRINT-SPECIFIC STYLES END === */
-/* ==================================== */
+/* ---------------------------------------------------------------------- */
