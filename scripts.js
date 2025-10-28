@@ -42,8 +42,9 @@ function generatePreviousDates() {
     const morningTableBody = document.getElementById("morningTableBody");
     const eveningTableBody = document.getElementById("eveningTableBody");
 
-    morningTableBody.innerHTML = "";
-    eveningTableBody.innerHTML = "";
+    // Use arrays to build content (performance improvement added for efficiency)
+    const morningRows = [];
+    const eveningRows = [];
 
     const currentDate = new Date(selectedDate);
     currentDate.setDate(currentDate.getDate() - 6);
@@ -52,16 +53,17 @@ function generatePreviousDates() {
 
     for (let i = 0; i < 7; i++) {
         const formattedDate = currentDate.toLocaleDateString('en-GB', formattedOptions);
+        
+        // **5-column structure (Date, Litres, Fat, SNF, Total Amount)**
         const rowMorning = `
             <tr>
                 <td>${formattedDate}</td>
                 <td><input type="number" class="input litres-morning" onchange="calculateAmount('morning', this)"></td>
                 <td><input type="number" class="input fat-morning" onchange="calculateAmount('morning', this)"></td>
                 <td><input type="number" class="input snf-morning" onchange="calculateAmount('morning', this)"></td>
-                <td class="total-amount-morning"></td>
-            </tr>
+                <td class="total-amount-morning"></td> </tr>
         `;
-        morningTableBody.innerHTML += rowMorning;
+        morningRows.push(rowMorning);
 
         const rowEvening = `
             <tr>
@@ -69,19 +71,22 @@ function generatePreviousDates() {
                 <td><input type="number" class="input litres-evening" onchange="calculateAmount('evening', this)"></td>
                 <td><input type="number" class="input fat-evening" onchange="calculateAmount('evening', this)"></td>
                 <td><input type="number" class="input snf-evening" onchange="calculateAmount('evening', this)"></td>
-                <td class="total-amount-evening"></td>
-            </tr>
+                <td class="total-amount-evening"></td> </tr>
         `;
-        eveningTableBody.innerHTML += rowEvening;
+        eveningRows.push(rowEvening);
 
         currentDate.setDate(currentDate.getDate() + 1);
     }
+    
+    // Update innerHTML once for efficiency
+    morningTableBody.innerHTML = morningRows.join('');
+    eveningTableBody.innerHTML = eveningRows.join('');
 }
 
 
-// --- START OF NEW/MODIFIED RATE LOGIC ---
+// --- START OF NEW/MODIFIED RATE LOGIC (UPDATED WITH YOUR JSON) ---
 
-// Milk Rate Chart converted from your Excel file
+// Milk Rate Chart converted from your JSON
 const milkRateChart = {
   "5.00": {
     "7.5": 28.00,
@@ -570,17 +575,24 @@ const milkRateChart = {
 
 /**
  * Looks up the rate based on Fat and SNF from the milkRateChart.
+/**
+ * Looks up the rate based on Fat and SNF from the milkRateChart.
  * @param {number} fat - The Fat percentage.
  * @param {number} snf - The SNF percentage.
  * @returns {number} The rate per litre, or 0.00 if not found.
  */
 function getRate(fat, snf) {
-    // Round to one decimal place and convert to string key for lookup
-    const fatKey = parseFloat(fat).toFixed(1);
+    // FIX: Fat must be formatted to two decimal places (e.g., "5.50")
+    const fatKey = parseFloat(fat).toFixed(2); 
+    
+    // SNF must be formatted to one decimal place (e.g., "8.0")
     const snfKey = parseFloat(snf).toFixed(1);
 
     // Look up the rate: milkRateChart[fatKey][snfKey]
     const rate = milkRateChart[fatKey] ? milkRateChart[fatKey][snfKey] : undefined;
+
+    // Use a console log for real-time debugging (highly recommended)
+    console.log(`Lookup: Fat Key = ${fatKey}, SNF Key = ${snfKey}, Rate = ${rate || 0.00}`);
 
     return rate !== undefined ? rate : 0.00;
 }
@@ -593,7 +605,7 @@ function getRate(fat, snf) {
 function calculateAmount(tableType, element) {
     const row = element.parentElement.parentElement;
     
-    // Get values from the respective inputs
+    // Get values from the respective inputs, ensuring proper fallback for parsing
     const litres = parseFloat(row.querySelector(`.litres-${tableType}`)?.value || 0);
     const fat = parseFloat(row.querySelector(`.fat-${tableType}`)?.value || 0);
     const snf = parseFloat(row.querySelector(`.snf-${tableType}`)?.value || 0);
@@ -604,16 +616,11 @@ function calculateAmount(tableType, element) {
     // Calculate total amount
     const totalAmount = (litres * ratePerLitre);
 
-    // Update the Rate cell and the Total Amount cell
+    // Update the Total Amount cell
     row.querySelector(`.total-amount-${tableType}`).textContent = totalAmount.toFixed(2);
 
     calculateTotals();
 }
-
-// REMOVED the previous 'calcAmount(fat, snf)' function.
-
-// --- END OF NEW/MODIFIED RATE LOGIC ---
-
 
 // Function to calculate totals (Only minor updates for the new Rate column)
 function calculateTotals() {
@@ -686,13 +693,13 @@ document.addEventListener("keydown", function (event) {
     }
 });
 function prepareForPrint() {
-  document.querySelectorAll("input").forEach(input => {
-    const span = document.createElement("span");
-    span.textContent = input.value || "";
-    span.style.display = "inline-block";
-    input.parentNode.replaceChild(span, input);
-  });
-  window.print();
+    document.querySelectorAll("input").forEach(input => {
+        const span = document.createElement("span");
+        span.textContent = input.value || "";
+        span.style.display = "inline-block";
+        input.parentNode.replaceChild(span, input);
+    });
+    window.print();
 }
 
 
