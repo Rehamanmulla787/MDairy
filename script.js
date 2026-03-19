@@ -4,12 +4,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const farmerList = document.getElementById("farmerList");
     const farmerInput = document.getElementById("farmerName");
 
-    // Example farmers (Replace this with real data from Firebase if needed)
     const farmers = ["Dashrath Salunke", "Anand Nandgavn", "Parasa Alas"];
 
-    // Load farmers into datalist
     function loadFarmers() {
-        farmerList.innerHTML = ""; // Clear previous options
+        farmerList.innerHTML = "";
         farmers.forEach(farmer => {
             const option = document.createElement("option");
             option.value = farmer;
@@ -17,12 +15,11 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    loadFarmers(); // Populate the list on page load
+    loadFarmers();
 
-    // Event: Show filtered suggestions while typing
     farmerInput.addEventListener("input", function () {
         const inputValue = this.value.toLowerCase();
-        farmerList.innerHTML = ""; // Clear previous options
+        farmerList.innerHTML = "";
 
         farmers.forEach(farmer => {
             if (farmer.toLowerCase().includes(inputValue)) {
@@ -33,7 +30,6 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     });
 });
-
 
 document.getElementById("billDate").addEventListener("change", generatePreviousDates);
 
@@ -52,37 +48,31 @@ function generatePreviousDates() {
 
     for (let i = 0; i < 7; i++) {
         const formattedDate = currentDate.toLocaleDateString('en-GB', formattedOptions);
-        const rowMorning = `
+
+        morningTableBody.innerHTML += `
             <tr>
                 <td>${formattedDate}</td>
                 <td><input type="number" class="input litres-morning" onchange="calculateAmount('morning', this)"></td>
                 <td><input type="number" class="input fat-morning" onchange="calculateAmount('morning', this)"></td>
                 <td><input type="number" class="input snf-morning" onchange="calculateAmount('morning', this)"></td>
                 <td class="total-amount-morning">0.00</td>
-            </tr>
-        `;
-        morningTableBody.innerHTML += rowMorning;
+            </tr>`;
 
-        const rowEvening = `
+        eveningTableBody.innerHTML += `
             <tr>
                 <td>${formattedDate}</td>
                 <td><input type="number" class="input litres-evening" onchange="calculateAmount('evening', this)"></td>
                 <td><input type="number" class="input fat-evening" onchange="calculateAmount('evening', this)"></td>
                 <td><input type="number" class="input snf-evening" onchange="calculateAmount('evening', this)"></td>
                 <td class="total-amount-evening">0.00</td>
-            </tr>
-        `;
-        eveningTableBody.innerHTML += rowEvening;
+            </tr>`;
 
         currentDate.setDate(currentDate.getDate() + 1);
     }
 }
 
+// ================= RATE CHART =================
 
-// --- START OF NEW/MODIFIED RATE LOGIC ---
-
-// Milk Rate Chart corrected: SNF keys are now one decimal place (e.g., "7.0") 
-// to match the output of getRate's snf.toFixed(1).
 const cowmilkRateChart = {
     "3.0": {
         "7.0": 21.0,
@@ -464,228 +454,47 @@ const cowmilkRateChart = {
     }
 };
 
-/**
- * Looks up the rate based on Fat and SNF from the milkRateChart.
- * @param {number} fat - The Fat percentage.
- * @param {number} snf - The SNF percentage.
- * @returns {number} The rate per litre, or 0.00 if not found.
- */
+// 🔥 FUNCTION
+// ✅ RATE ADJUSTMENT — Change this single value to increase or decrease all rates
+// Positive = increase, Negative = decrease
+// Examples: 1 = +1 rupee, -2 = -2 rupees, 0.5 = +50 paise
+const RATE_ADJUSTMENT = 1; // Currently set to +1 rupee
+
 function getRate(fat, snf) {
-    // Round to one decimal place and convert to string key for lookup
-    // This is correct and dictates the required format for the milkRateChart keys.
     const fatKey = parseFloat(fat).toFixed(1);
     const snfKey = parseFloat(snf).toFixed(1);
 
-    // Look up the rate: milkRateChart[fatKey][snfKey]
-    const rate = cowmilkRateChart[fatKey] ? cowmilkRateChart[fatKey][snfKey] : undefined;
+    const baseRate = cowmilkRateChart[fatKey] ? cowmilkRateChart[fatKey][snfKey] : undefined;
 
-    return rate !== undefined ? rate : 0.00;
+    // Apply adjustment to whatever rate is found
+    return baseRate !== undefined ? baseRate + RATE_ADJUSTMENT : 0.00;
 }
 
-/**
- * Calculates the total amount for a row using the milk rate chart lookup.
- * @param {string} tableType - 'morning' or 'evening'.
- * @param {HTMLElement} element - The input element that was changed.
- */
-function calculateAmount(tableType, element) {
-    const row = element.parentElement.parentElement;
-    
-    // Get values from the respective inputs
-    const litres = parseFloat(row.querySelector(`.litres-${tableType}`)?.value || 0);
-    const fat = parseFloat(row.querySelector(`.fat-${tableType}`)?.value || 0);
-    const snf = parseFloat(row.querySelector(`.snf-${tableType}`)?.value || 0);
+function calculateAmount(type, element) {
+    const row = element.closest("tr");
 
-    // Look up the rate
-    const ratePerLitre = getRate(fat, snf); 
-    
-    // Calculate total amount
-    const totalAmount = (litres * ratePerLitre);
+    const litres = parseFloat(row.querySelector(`.litres-${type}`)?.value || 0);
+    const fat = parseFloat(row.querySelector(`.fat-${type}`)?.value || 0);
+    const snf = parseFloat(row.querySelector(`.snf-${type}`)?.value || 0);
 
-    // Update the Total Amount cell
-    row.querySelector(`.total-amount-${tableType}`).textContent = totalAmount.toFixed(2);
+    const rate = getRate(fat, snf);
+    const total = litres * rate;
+
+    row.querySelector(`.total-amount-${type}`).textContent = total.toFixed(2);
 
     calculateTotals();
 }
 
-// --- END OF NEW/MODIFIED RATE LOGIC ---
-
-
-// Function to calculate totals (Only minor updates for the new Rate column)
 function calculateTotals() {
-    let totalLitresMorning = 0, totalAmountMorning = 0;
-    let totalLitresEvening = 0, totalAmountEvening = 0;
+    let totalLitres = 0, totalAmount = 0;
 
-    document.querySelectorAll("#morningTableBody tr").forEach(row => {
-        totalLitresMorning += parseFloat(row.querySelector(".litres-morning")?.value || 0);
-        // Note: Reads total amount from the display TD, not recalculating
-        totalAmountMorning += parseFloat(row.querySelector(".total-amount-morning")?.textContent || "0");
+    document.querySelectorAll("tbody tr").forEach(row => {
+        totalLitres += parseFloat(row.querySelector("input")?.value || 0);
+        totalAmount += parseFloat(row.querySelector("td:last-child")?.textContent || 0);
     });
 
-    document.querySelectorAll("#eveningTableBody tr").forEach(row => {
-        totalLitresEvening += parseFloat(row.querySelector(".litres-evening")?.value || 0);
-        totalAmountEvening += parseFloat(row.querySelector(".total-amount-evening")?.textContent || "0");
-    });
-
-    document.getElementById("morningTotalLitres").textContent = totalLitresMorning.toFixed(2);
-    document.getElementById("morningTotalAmount").textContent = totalAmountMorning.toFixed(2);
-    document.getElementById("eveningTotalLitres").textContent = totalLitresEvening.toFixed(2);
-    document.getElementById("eveningTotalAmount").textContent = totalAmountEvening.toFixed(2);
-
-    document.getElementById("totalLitres").textContent = (totalLitresMorning + totalLitresEvening).toFixed(2);
-    document.getElementById("totalAmount").textContent = (totalAmountMorning + totalAmountEvening).toFixed(2);
+    document.getElementById("totalLitres").textContent = totalLitres.toFixed(2);
+    document.getElementById("totalAmount").textContent = totalAmount.toFixed(2);
 }
 
-document.addEventListener("keydown", function (event) {
-    const activeElement = document.activeElement;
-
-    if (activeElement.tagName === "INPUT") {
-        let row = activeElement.closest("tr");
-        if (!row) return; 
-        
-        let table = row.closest("tbody");
-        if (!table) return; 
-
-        let inputs = Array.from(table.querySelectorAll("input"));
-        let index = inputs.indexOf(activeElement);
-
-        if (event.key === "ArrowRight" && index < inputs.length - 1) {
-            event.preventDefault(); // Prevent browser auto-fill
-            inputs[index + 1].focus();
-        } 
-        else if (event.key === "ArrowLeft" && index > 0) {
-            event.preventDefault();
-            inputs[index - 1].focus();
-        } 
-        else if (event.key === "ArrowDown") {
-            // cellIndex is relative to the row, starting at 0 (Date)
-            let cellIndex = activeElement.parentElement?.cellIndex;
-            // The first input is in the 2nd cell (index 1), so subtract 1 to align with input index
-            let inputColumnIndex = activeElement.parentElement?.cellIndex; 
-            
-            // We need to find the next input only in the column that has inputs (Litres, Fat, SNF which are columns 1, 2, 3)
-            if (inputColumnIndex !== undefined) {
-                let nextRow = row.nextElementSibling;
-                // Since the first column is Date (no input), the input will be in the (inputColumnIndex - 1) child of the next row.
-                // Wait, no. The cellIndex is based on the TD.
-                // Date is TD 0. Litres is TD 1. Fat is TD 2. SNF is TD 3.
-                let nextInput = nextRow?.children[cellIndex]?.querySelector("input");
-                
-                if (nextInput) {
-                    event.preventDefault();
-                    nextInput.focus();
-                } else if (cellIndex === 3 && table.id === 'morningTableBody' && nextRow === null) {
-                    // Special case: Pressing down on the last SNF input (Morning) moves focus to the first Litres input (Evening)
-                    let eveningTable = document.getElementById('eveningTableBody');
-                    let firstEveningInput = eveningTable.querySelector(".litres-evening");
-                    if (firstEveningInput) {
-                        event.preventDefault();
-                        firstEveningInput.focus();
-                    }
-                }
-            }
-        } 
-        else if (event.key === "ArrowUp") {
-            let cellIndex = activeElement.parentElement?.cellIndex;
-            if (cellIndex !== undefined) {
-                let prevRow = row.previousElementSibling;
-                let prevInput = prevRow?.children[cellIndex]?.querySelector("input");
-                
-                if (prevInput) {
-                    event.preventDefault();
-                    prevInput.focus();
-                } else if (cellIndex === 1 && table.id === 'eveningTableBody' && prevRow === null) {
-                    // Special case: Pressing up on the first Litres input (Evening) moves focus to the last SNF input (Morning)
-                    let morningTable = document.getElementById('morningTableBody');
-                    let lastMorningRow = morningTable.lastElementChild;
-                    let lastMorningInput = lastMorningRow?.children[3]?.querySelector("input");
-                    if (lastMorningInput) {
-                        event.preventDefault();
-                        lastMorningInput.focus();
-                    }
-                }
-            }
-        }
-    }
-});
-
-function prepareForPrint() {
-    document.querySelectorAll("input").forEach(input => {
-        const span = document.createElement("span");
-        span.textContent = input.value || "";
-        span.style.display = "inline-block";
-        input.parentNode.replaceChild(span, input);
-    });
-    window.print();
-}
-
-
-function clearData() {
-    const elementsToClear = [
-        "billDate", "farmerName", "balance", 
-        "morningTotalLitres", "morningTotalAmount",
-        "eveningTotalLitres", "eveningTotalAmount",
-        "totalLitres", "totalAmount", "signature"
-    ];
-
-    // Clear input fields and displayed text
-    elementsToClear.forEach(id => {
-        const element = document.getElementById(id);
-        if (element) {
-            if (element.tagName === "INPUT") {
-                element.value = "";
-            } else {
-                element.textContent = "-"; // Set to default display
-            }
-        }
-    });
-
-    // Clear all table data (both text content and inputs inside tables)
-    document.querySelectorAll("table tbody").forEach(tbody => tbody.innerHTML = "");
-
-    // Clear inputs inside tables (if tables use inputs for data entry)
-    document.querySelectorAll("table input").forEach(input => input.value = "");
-    
-    // Re-generate the table rows with the new structure
-    generatePreviousDates();
-
-    alert("All data cleared successfully");
-}
-
-
-document.addEventListener("DOMContentLoaded", () => {
-    // Set today's date on load and generate table rows
-    document.getElementById("billDate").value = new Date().toISOString().substring(0, 10);
-    generatePreviousDates();
-
-    const darkModeToggle = document.createElement("button");
-    darkModeToggle.innerHTML = "🌙"; // Default icon as moon
-    darkModeToggle.classList.add("dark-mode-toggle");
-    document.body.appendChild(darkModeToggle);
-
-    if (localStorage.getItem("darkMode") === "enabled") {
-        document.body.classList.add("dark-mode");
-        darkModeToggle.innerHTML = "☀️"; // Change to sun
-    }
-
-    darkModeToggle.addEventListener("click", () => {
-        document.body.classList.toggle("dark-mode");
-        document.body.style.transition = "background-color 0.3s ease-in-out, color 0.3s ease-in-out";
-        
-        if (document.body.classList.contains("dark-mode")) {
-            localStorage.setItem("darkMode", "enabled");
-            darkModeToggle.innerHTML = "☀️";
-        } else {
-            localStorage.setItem("darkMode", "disabled");
-            darkModeToggle.innerHTML = "🌙";
-        }
-    });
-});
-
-// Expose functions to the global scope for use in HTML attributes
-window.generatePreviousDates = generatePreviousDates;
-window.calculateAmount = calculateAmount;
-window.calculateTotals = calculateTotals;
-window.prepareForPrint = prepareForPrint;
-window.clearData = clearData;
-
-// --- End of Corrected scripts.js ---
+// --- End ---
