@@ -573,6 +573,8 @@ const milkRateChart = {
   }
 };
 
+
+
 /**
  * Looks up the rate based on Fat and SNF from the milkRateChart.
 /**
@@ -581,6 +583,8 @@ const milkRateChart = {
  * @param {number} snf - The SNF percentage.
  * @returns {number} The rate per litre, or 0.00 if not found.
  */
+const RATE_ADJUSTMENT = 1; // Currently set to +1 rupee
+
 function getRate(fat, snf) {
     // FIX: Fat must be formatted to two decimal places (e.g., "5.50")
     const fatKey = parseFloat(fat).toFixed(2); 
@@ -591,10 +595,10 @@ function getRate(fat, snf) {
     // Look up the rate: milkRateChart[fatKey][snfKey]
     const rate = milkRateChart[fatKey] ? milkRateChart[fatKey][snfKey] : undefined;
 
-    // Use a console log for real-time debugging (highly recommended)
-    console.log(`Lookup: Fat Key = ${fatKey}, SNF Key = ${snfKey}, Rate = ${rate || 0.00}`);
+    console.log(`Lookup: Fat Key = ${fatKey}, SNF Key = ${snfKey}, Rate = ${rate !== undefined ? rate + RATE_ADJUSTMENT : 0.00}`);
 
-    return rate !== undefined ? rate : 0.00;
+    // Apply RATE_ADJUSTMENT on top of the base rate
+    return rate !== undefined ? rate + RATE_ADJUSTMENT : 0.00;
 }
 
 /**
