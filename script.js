@@ -469,6 +469,15 @@ function getRate(fat, snf) {
     // Apply adjustment to whatever rate is found
     return baseRate !== undefined ? baseRate + RATE_ADJUSTMENT : 0.00;
 }
+function prepareForPrint() {
+    document.querySelectorAll("input").forEach(input => {
+        const span = document.createElement("span");
+        span.textContent = input.value || "";
+        span.style.display = "inline-block";
+        input.parentNode.replaceChild(span, input);
+    });
+    window.print();
+}
 
 function calculateAmount(type, element) {
     const row = element.closest("tr");
