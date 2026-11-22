@@ -851,7 +851,7 @@ const milkRateChart = {
 
 // Change this single value to raise or lower all rates.
 // Positive = increase, negative = decrease. Examples: 1 = +1 rupee, -2 = -2 rupees, 0.5 = +50 paise
-const RATE_ADJUSTMENT = 1; // Currently +1 rupee
+const RATE_ADJUSTMENT = 0; // Currently +1 rupee
 
 // Returns the rate, or null if FAT/SNF is not in the chart.
 function getRate(fat, snf) {
