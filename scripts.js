@@ -1,15 +1,15 @@
-// --- Start of Updated scripts.js ---
+// --- scripts.js (merged: cow milk chart + fixes + all original features) ---
+
+function todayLocal() {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
 
 document.addEventListener("DOMContentLoaded", function () {
+    // ---------- Farmer list ----------
     const farmerList = document.getElementById("farmerList");
-    const farmerInput = document.getElementById("farmerName");
-
-    // Example farmers (Replace this with real data from Firebase if needed)
     const farmers = ["Dashrath Salunke", "Anand Nandgavn", "Parasa Alas"];
-
-    // Load farmers into datalist
-    function loadFarmers() {
-        farmerList.innerHTML = ""; // Clear previous options
+    if (farmerList) {
         farmers.forEach(farmer => {
             const option = document.createElement("option");
             option.value = farmer;
@@ -17,755 +17,986 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    loadFarmers(); // Populate the list on page load
+    // ---------- Bill date ----------
+    const billDate = document.getElementById("billDate");
+    if (billDate) {
+        billDate.addEventListener("change", generatePreviousDates);
+        billDate.value = todayLocal(); // today's date on load
+    }
 
-    // Event: Show filtered suggestions while typing
-    farmerInput.addEventListener("input", function () {
-        const inputValue = this.value.toLowerCase();
-        farmerList.innerHTML = ""; // Clear previous options
-
-        farmers.forEach(farmer => {
-            if (farmer.toLowerCase().includes(inputValue)) {
-                const option = document.createElement("option");
-                option.value = farmer;
-                farmerList.appendChild(option);
-            }
+    // ---------- Recalculate while typing (one listener per table) ----------
+    [["morningTableBody", "morning"], ["eveningTableBody", "evening"]].forEach(([id, type]) => {
+        const body = document.getElementById(id);
+        if (!body) return;
+        body.addEventListener("input", function (e) {
+            if (e.target.matches("input")) calculateAmount(type, e.target);
         });
+    });
+
+    generatePreviousDates();
+
+    // ---------- Dark mode ----------
+    const darkModeToggle = document.createElement("button");
+    darkModeToggle.innerHTML = "🌙";
+    darkModeToggle.classList.add("dark-mode-toggle");
+    document.body.appendChild(darkModeToggle);
+
+    try {
+        if (localStorage.getItem("darkMode") === "enabled") {
+            document.body.classList.add("dark-mode");
+            darkModeToggle.innerHTML = "☀️";
+        }
+    } catch (e) { /* storage unavailable */ }
+
+    darkModeToggle.addEventListener("click", () => {
+        document.body.classList.toggle("dark-mode");
+        document.body.style.transition = "background-color 0.3s ease-in-out, color 0.3s ease-in-out";
+        const on = document.body.classList.contains("dark-mode");
+        darkModeToggle.innerHTML = on ? "☀️" : "🌙";
+        try { localStorage.setItem("darkMode", on ? "enabled" : "disabled"); } catch (e) { /* ignore */ }
     });
 });
 
-
-document.getElementById("billDate").addEventListener("change", generatePreviousDates);
-
 function generatePreviousDates() {
-    const selectedDate = new Date(document.getElementById("billDate").value);
     const morningTableBody = document.getElementById("morningTableBody");
     const eveningTableBody = document.getElementById("eveningTableBody");
+    const value = document.getElementById("billDate").value; // "YYYY-MM-DD"
 
-    // Use arrays to build content (performance improvement added for efficiency)
-    const morningRows = [];
-    const eveningRows = [];
+    // Date cleared: empty the tables instead of showing "Invalid Date"
+    if (!value) {
+        morningTableBody.innerHTML = "";
+        eveningTableBody.innerHTML = "";
+        calculateTotals();
+        return;
+    }
 
-    const currentDate = new Date(selectedDate);
-    currentDate.setDate(currentDate.getDate() - 6);
+    // Parse parts manually to avoid UTC time zone shifts
+    const [y, m, d] = value.split("-").map(Number);
+    const currentDate = new Date(y, m - 1, d - 6);
 
-    const formattedOptions = { month: '2-digit', day: '2-digit' };
+    let morningHtml = "";
+    let eveningHtml = "";
 
     for (let i = 0; i < 7; i++) {
-        const formattedDate = currentDate.toLocaleDateString('en-GB', formattedOptions);
-        
-        // **5-column structure (Date, Litres, Fat, SNF, Total Amount)**
-        const rowMorning = `
-            <tr>
-                <td>${formattedDate}</td>
-                <td><input type="number" class="input litres-morning" onchange="calculateAmount('morning', this)"></td>
-                <td><input type="number" class="input fat-morning" onchange="calculateAmount('morning', this)"></td>
-                <td><input type="number" class="input snf-morning" onchange="calculateAmount('morning', this)"></td>
-                <td class="total-amount-morning"></td> </tr>
-        `;
-        morningRows.push(rowMorning);
+        const dd = String(currentDate.getDate()).padStart(2, "0");
+        const mm = String(currentDate.getMonth() + 1).padStart(2, "0");
+        const formattedDate = `${dd}/${mm}`;
 
-        const rowEvening = `
+        ["morning", "evening"].forEach(type => {
+            const rowHtml = `
             <tr>
                 <td>${formattedDate}</td>
-                <td><input type="number" class="input litres-evening" onchange="calculateAmount('evening', this)"></td>
-                <td><input type="number" class="input fat-evening" onchange="calculateAmount('evening', this)"></td>
-                <td><input type="number" class="input snf-evening" onchange="calculateAmount('evening', this)"></td>
-                <td class="total-amount-evening"></td> </tr>
-        `;
-        eveningRows.push(rowEvening);
+                <td><input type="number" class="input litres-${type}" min="0" step="0.01"></td>
+                <td><input type="number" class="input fat-${type}" min="0" step="0.1"></td>
+                <td><input type="number" class="input snf-${type}" min="0" step="0.1"></td>
+                <td class="total-amount-${type}">0.00</td>
+                <td class="rate-${type}" style="display:none">0.00</td>
+            </tr>`;
+            if (type === "morning") morningHtml += rowHtml;
+            else eveningHtml += rowHtml;
+        });
 
         currentDate.setDate(currentDate.getDate() + 1);
     }
-    
-    // Update innerHTML once for efficiency
-    morningTableBody.innerHTML = morningRows.join('');
-    eveningTableBody.innerHTML = eveningRows.join('');
+
+    morningTableBody.innerHTML = morningHtml;
+    eveningTableBody.innerHTML = eveningHtml;
+    calculateTotals(); // reset totals to match the new empty tables
 }
 
+// ================= RATE CHART =================
 
-// --- START OF NEW/MODIFIED RATE LOGIC (UPDATED WITH YOUR JSON) ---
-
-// Milk Rate Chart converted from your JSON
 const milkRateChart = {
-  "5.00": {
-    "7.5": 28.00,
-    "7.6": 29.00,
-    "7.7": 30.00,
-    "7.8": 31.00,
-    "7.9": 32.00,
-    "8.0": 33.00,
-    "8.1": 34.00,
-    "8.2": 35.00,
-    "8.3": 36.00,
-    "8.4": 37.00,
-    "8.5": 38.00,
-    "8.6": 38.90,
-    "8.7": 39.70,
-    "8.8": 40.40,
-    "8.9": 41.00,
-    "9.0": 41.50,
-    "9.1": 41.50,
-    "9.2": 41.50,
-    "9.3": 41.50,
-    "9.4": 41.50,
-    "9.5": 41.50
-  },
-  "5.10": {
-    "7.5": 29.50,
-    "7.6": 30.50,
-    "7.7": 31.50,
-    "7.8": 32.50,
-    "7.9": 33.50,
-    "8.0": 34.50,
-    "8.1": 35.50,
-    "8.2": 36.50,
-    "8.3": 37.50,
-    "8.4": 38.50,
-    "8.5": 39.50,
-    "8.6": 40.40,
-    "8.7": 41.20,
-    "8.8": 41.90,
-    "8.9": 42.50,
-    "9.0": 43.00,
-    "9.1": 43.00,
-    "9.2": 43.00,
-    "9.3": 43.00,
-    "9.4": 43.00,
-    "9.5": 43.00
-  },
-  "5.20": {
-    "7.5": 30.90,
-    "7.6": 31.90,
-    "7.7": 32.90,
-    "7.8": 33.90,
-    "7.9": 34.90,
-    "8.0": 35.90,
-    "8.1": 36.90,
-    "8.2": 37.90,
-    "8.3": 38.90,
-    "8.4": 39.90,
-    "8.5": 40.90,
-    "8.6": 41.80,
-    "8.7": 42.60,
-    "8.8": 43.30,
-    "8.9": 43.90,
-    "9.0": 44.40,
-    "9.1": 44.40,
-    "9.2": 44.40,
-    "9.3": 44.40,
-    "9.4": 44.40,
-    "9.5": 44.40
-  },
-  "5.30": {
-    "7.5": 32.20,
-    "7.6": 33.20,
-    "7.7": 34.20,
-    "7.8": 35.20,
-    "7.9": 36.20,
-    "8.0": 37.20,
-    "8.1": 38.20,
-    "8.2": 39.20,
-    "8.3": 40.20,
-    "8.4": 41.20,
-    "8.5": 42.20,
-    "8.6": 43.10,
-    "8.7": 43.90,
-    "8.8": 44.60,
-    "8.9": 45.20,
-    "9.0": 45.70,
-    "9.1": 45.70,
-    "9.2": 45.70,
-    "9.3": 45.70,
-    "9.4": 45.70,
-    "9.5": 45.70
-  },
-  "5.40": {
-    "7.5": 33.40,
-    "7.6": 34.40,
-    "7.7": 35.40,
-    "7.8": 36.40,
-    "7.9": 37.40,
-    "8.0": 38.40,
-    "8.1": 39.40,
-    "8.2": 40.40,
-    "8.3": 41.40,
-    "8.4": 42.40,
-    "8.5": 43.40,
-    "8.6": 44.30,
-    "8.7": 45.10,
-    "8.8": 45.80,
-    "8.9": 46.40,
-    "9.0": 46.90,
-    "9.1": 46.90,
-    "9.2": 46.90,
-    "9.3": 46.90,
-    "9.4": 46.90,
-    "9.5": 46.90
-  },
-  "5.50": {
-    "7.5": 34.50,
-    "7.6": 35.50,
-    "7.7": 36.50,
-    "7.8": 37.50,
-    "7.9": 38.50,
-    "8.0": 39.50,
-    "8.1": 40.50,
-    "8.2": 41.50,
-    "8.3": 42.50,
-    "8.4": 43.50,
-    "8.5": 44.50,
-    "8.6": 45.40,
-    "8.7": 46.20,
-    "8.8": 46.90,
-    "8.9": 47.50,
-    "9.0": 48.00,
-    "9.1": 48.10,
-    "9.2": 48.20,
-    "9.3": 48.30,
-    "9.4": 48.40,
-    "9.5": 48.50
-  },
-  "5.60": {
-    "7.5": 35.50,
-    "7.6": 36.50,
-    "7.7": 37.50,
-    "7.8": 38.50,
-    "7.9": 39.50,
-    "8.0": 40.50,
-    "8.1": 41.50,
-    "8.2": 42.50,
-    "8.3": 43.50,
-    "8.4": 44.50,
-    "8.5": 45.50,
-    "8.6": 46.40,
-    "8.7": 47.20,
-    "8.8": 47.90,
-    "8.9": 48.50,
-    "9.0": 49.00,
-    "9.1": 49.10,
-    "9.2": 49.20,
-    "9.3": 49.30,
-    "9.4": 49.40,
-    "9.5": 49.50
-  },
-  "5.70": {
-    "7.5": 36.40,
-    "7.6": 37.40,
-    "7.7": 38.40,
-    "7.8": 39.40,
-    "7.9": 40.40,
-    "8.0": 41.40,
-    "8.1": 42.40,
-    "8.2": 43.40,
-    "8.3": 44.40,
-    "8.4": 45.40,
-    "8.5": 46.40,
-    "8.6": 47.30,
-    "8.7": 48.10,
-    "8.8": 48.80,
-    "8.9": 49.40,
-    "9.0": 49.90,
-    "9.1": 50.00,
-    "9.2": 50.10,
-    "9.3": 50.20,
-    "9.4": 50.30,
-    "9.5": 50.40
-  },
-  "5.80": {
-    "7.5": 37.20,
-    "7.6": 38.20,
-    "7.7": 39.20,
-    "7.8": 40.20,
-    "7.9": 41.20,
-    "8.0": 42.20,
-    "8.1": 43.20,
-    "8.2": 44.20,
-    "8.3": 45.20,
-    "8.4": 46.20,
-    "8.5": 47.20,
-    "8.6": 48.10,
-    "8.7": 48.90,
-    "8.8": 49.60,
-    "8.9": 50.20,
-    "9.0": 50.70,
-    "9.1": 50.80,
-    "9.2": 50.90,
-    "9.3": 51.00,
-    "9.4": 51.10,
-    "9.5": 51.20
-  },
-  "5.90": {
-    "7.5": 37.90,
-    "7.6": 38.90,
-    "7.7": 39.90,
-    "7.8": 40.90,
-    "7.9": 41.90,
-    "8.0": 42.90,
-    "8.1": 43.90,
-    "8.2": 44.90,
-    "8.3": 45.90,
-    "8.4": 46.90,
-    "8.5": 47.90,
-    "8.6": 48.80,
-    "8.7": 49.60,
-    "8.8": 50.30,
-    "8.9": 50.90,
-    "9.0": 51.40,
-    "9.1": 51.50,
-    "9.2": 51.60,
-    "9.3": 51.70,
-    "9.4": 51.80,
-    "9.5": 51.90
-  },
-  "6.00": {
-    "7.5": 38.50,
-    "7.6": 39.50,
-    "7.7": 40.50,
-    "7.8": 41.50,
-    "7.9": 42.50,
-    "8.0": 43.50,
-    "8.1": 44.50,
-    "8.2": 45.50,
-    "8.3": 46.50,
-    "8.4": 47.50,
-    "8.5": 48.50,
-    "8.6": 49.40,
-    "8.7": 50.20,
-    "8.8": 50.90,
-    "8.9": 51.50,
-    "9.0": 59.50,
-    "9.1": 52.10,
-    "9.2": 52.20,
-    "9.3": 52.30,
-    "9.4": 52.40,
-    "9.5": 52.50
-  },
-  "6.10": {
-    "7.5": 39.10,
-    "7.6": 40.10,
-    "7.7": 41.10,
-    "7.8": 42.10,
-    "7.9": 43.10,
-    "8.0": 44.10,
-    "8.1": 45.10,
-    "8.2": 46.10,
-    "8.3": 47.10,
-    "8.4": 48.10,
-    "8.5": 49.10,
-    "8.6": 50.00,
-    "8.7": 50.80,
-    "8.8": 51.50,
-    "8.9": 52.10,
-    "9.0": 52.60,
-    "9.1": 52.70,
-    "9.2": 52.80,
-    "9.3": 52.90,
-    "9.4": 53.00,
-    "9.5": 53.10
-  },
-  "6.20": {
-    "7.5": 39.70,
-    "7.6": 40.70,
-    "7.7": 41.70,
-    "7.8": 42.70,
-    "7.9": 43.70,
-    "8.0": 44.70,
-    "8.1": 45.70,
-    "8.2": 46.70,
-    "8.3": 47.70,
-    "8.4": 48.70,
-    "8.5": 49.70,
-    "8.6": 50.60,
-    "8.7": 51.40,
-    "8.8": 52.10,
-    "8.9": 52.70,
-    "9.0": 53.20,
-    "9.1": 53.30,
-    "9.2": 53.40,
-    "9.3": 53.50,
-    "9.4": 53.60,
-    "9.5": 53.70
-  },
-  "6.30": {
-    "7.5": 40.30,
-    "7.6": 41.30,
-    "7.7": 42.30,
-    "7.8": 43.30,
-    "7.9": 44.30,
-    "8.0": 45.30,
-    "8.1": 46.30,
-    "8.2": 47.30,
-    "8.3": 48.30,
-    "8.4": 49.30,
-    "8.5": 50.30,
-    "8.6": 51.20,
-    "8.7": 52.00,
-    "8.8": 52.70,
-    "8.9": 53.30,
-    "9.0": 53.80,
-    "9.1": 53.90,
-    "9.2": 54.00,
-    "9.3": 54.10,
-    "9.4": 54.20,
-    "9.5": 54.30
-  },
-  "6.40": {
-    "7.5": 40.90,
-    "7.6": 41.90,
-    "7.7": 42.90,
-    "7.8": 43.90,
-    "7.9": 44.90,
-    "8.0": 45.90,
-    "8.1": 46.90,
-    "8.2": 47.90,
-    "8.3": 48.90,
-    "8.4": 49.90,
-    "8.5": 50.90,
-    "8.6": 51.80,
-    "8.7": 52.60,
-    "8.8": 53.30,
-    "8.9": 53.90,
-    "9.0": 54.40,
-    "9.1": 54.50,
-    "9.2": 54.60,
-    "9.3": 54.70,
-    "9.4": 54.80,
-    "9.5": 54.90
-  },
-  "6.50": {
-    "7.5": 41.50,
-    "7.6": 42.50,
-    "7.7": 43.50,
-    "7.8": 44.50,
-    "7.9": 45.50,
-    "8.0": 46.50,
-    "8.1": 47.50,
-    "8.2": 48.50,
-    "8.3": 49.50,
-    "8.4": 50.50,
-    "8.5": 51.50,
-    "8.6": 52.40,
-    "8.7": 53.20,
-    "8.8": 53.90,
-    "8.9": 54.50,
-    "9.0": 55.00,
-    "9.1": 55.10,
-    "9.2": 55.20,
-    "9.3": 55.30,
-    "9.4": 55.40,
-    "9.5": 55.50
-  },
-  "6.60": {
-    "7.5": 42.10,
-    "7.6": 43.10,
-    "7.7": 44.10,
-    "7.8": 45.10,
-    "7.9": 46.10,
-    "8.0": 47.10,
-    "8.1": 48.10,
-    "8.2": 49.10,
-    "8.3": 50.10,
-    "8.4": 51.10,
-    "8.5": 52.10,
-    "8.6": 53.00,
-    "8.7": 53.80,
-    "8.8": 54.50,
-    "8.9": 55.10,
-    "9.0": 55.60,
-    "9.1": 55.70,
-    "9.2": 55.80,
-    "9.3": 55.90,
-    "9.4": 56.00,
-    "9.5": 56.10
-  },
-  "6.70": {
-    "7.5": 42.70,
-    "7.6": 43.70,
-    "7.7": 44.70,
-    "7.8": 45.70,
-    "7.9": 46.70,
-    "8.0": 47.70,
-    "8.1": 48.70,
-    "8.2": 49.70,
-    "8.3": 50.70,
-    "8.4": 51.70,
-    "8.5": 52.70,
-    "8.6": 53.60,
-    "8.7": 54.40,
-    "8.8": 55.10,
-    "8.9": 55.70,
-    "9.0": 56.20,
-    "9.1": 56.30,
-    "9.2": 56.40,
-    "9.3": 56.50,
-    "9.4": 56.60,
-    "9.5": 56.70
-  },
-  "6.80": {
-    "7.5": 43.30,
-    "7.6": 44.30,
-    "7.7": 45.30,
-    "7.8": 46.30,
-    "7.9": 47.30,
-    "8.0": 48.30,
-    "8.1": 49.30,
-    "8.2": 50.30,
-    "8.3": 51.30,
-    "8.4": 52.30,
-    "8.5": 53.30,
-    "8.6": 54.20,
-    "8.7": 55.00,
-    "8.8": 55.70,
-    "8.9": 56.30,
-    "9.0": 56.80,
-    "9.1": 56.90,
-    "9.2": 57.00,
-    "9.3": 57.10,
-    "9.4": 57.20,
-    "9.5": 57.30
-  },
-  "6.90": {
-    "7.5": 43.90,
-    "7.6": 44.90,
-    "7.7": 45.90,
-    "7.8": 46.90,
-    "7.9": 47.90,
-    "8.0": 48.90,
-    "8.1": 49.90,
-    "8.2": 50.90,
-    "8.3": 51.90,
-    "8.4": 52.90,
-    "8.5": 53.90,
-    "8.6": 54.80,
-    "8.7": 55.60,
-    "8.8": 56.30,
-    "8.9": 56.90,
-    "9.0": 57.40,
-    "9.1": 57.50,
-    "9.2": 57.60,
-    "9.3": 57.70,
-    "9.4": 57.80,
-    "9.5": 57.90
-  },
-  "7.00": {
-    "7.5": 45.50,
-    "7.6": 46.50,
-    "7.7": 47.50,
-    "7.8": 48.50,
-    "7.9": 49.50,
-    "8.0": 50.50,
-    "8.1": 51.50,
-    "8.2": 52.50,
-    "8.3": 53.50,
-    "8.4": 54.50,
-    "8.5": 55.50,
-    "8.6": 56.40,
-    "8.7": 57.20,
-    "8.8": 57.90,
-    "8.9": 58.50,
-    "9.0": 59.00,
-    "9.1": 59.10,
-    "9.2": 59.20,
-    "9.3": 59.30,
-    "9.4": 59.40,
-    "9.5": 59.50
-  }
+    "5.0": {
+        "8.5": 52.0,
+        "8.6": 52.5,
+        "8.7": 53.0,
+        "8.8": 53.5,
+        "8.9": 54.0,
+        "9.0": 54.5,
+        "9.1": 55.0,
+        "9.2": 55.5,
+        "9.3": 56.0,
+        "9.4": 56.5,
+        "9.5": 57.0,
+        "9.6": 57.5,
+        "9.7": 58.0,
+        "9.8": 58.5,
+        "9.9": 59.0,
+        "10.0": 59.5
+    },
+    "5.1": {
+        "8.5": 52.5,
+        "8.6": 53.0,
+        "8.7": 53.5,
+        "8.8": 54.0,
+        "8.9": 54.5,
+        "9.0": 55.0,
+        "9.1": 55.5,
+        "9.2": 56.0,
+        "9.3": 56.5,
+        "9.4": 57.0,
+        "9.5": 57.5,
+        "9.6": 58.0,
+        "9.7": 58.5,
+        "9.8": 59.0,
+        "9.9": 59.5,
+        "10.0": 60.0
+    },
+    "5.2": {
+        "8.5": 53.0,
+        "8.6": 53.5,
+        "8.7": 54.0,
+        "8.8": 54.5,
+        "8.9": 55.0,
+        "9.0": 55.5,
+        "9.1": 56.0,
+        "9.2": 56.5,
+        "9.3": 57.0,
+        "9.4": 57.5,
+        "9.5": 58.0,
+        "9.6": 58.5,
+        "9.7": 59.0,
+        "9.8": 59.5,
+        "9.9": 60.0,
+        "10.0": 60.5
+    },
+    "5.3": {
+        "8.5": 53.5,
+        "8.6": 54.0,
+        "8.7": 54.5,
+        "8.8": 55.0,
+        "8.9": 55.5,
+        "9.0": 56.0,
+        "9.1": 56.5,
+        "9.2": 57.0,
+        "9.3": 57.5,
+        "9.4": 58.0,
+        "9.5": 58.5,
+        "9.6": 59.0,
+        "9.7": 59.5,
+        "9.8": 60.0,
+        "9.9": 60.5,
+        "10.0": 61.0
+    },
+    "5.4": {
+        "8.5": 54.0,
+        "8.6": 54.5,
+        "8.7": 55.0,
+        "8.8": 55.5,
+        "8.9": 56.0,
+        "9.0": 56.5,
+        "9.1": 57.0,
+        "9.2": 57.5,
+        "9.3": 58.0,
+        "9.4": 58.5,
+        "9.5": 59.0,
+        "9.6": 59.5,
+        "9.7": 60.0,
+        "9.8": 60.5,
+        "9.9": 61.0,
+        "10.0": 61.5
+    },
+    "5.5": {
+        "8.5": 54.5,
+        "8.6": 55.0,
+        "8.7": 55.5,
+        "8.8": 56.0,
+        "8.9": 56.5,
+        "9.0": 57.0,
+        "9.1": 57.5,
+        "9.2": 58.0,
+        "9.3": 58.5,
+        "9.4": 59.0,
+        "9.5": 59.5,
+        "9.6": 60.0,
+        "9.7": 60.5,
+        "9.8": 61.0,
+        "9.9": 61.5,
+        "10.0": 62.0
+    },
+    "5.6": {
+        "8.5": 55.0,
+        "8.6": 55.5,
+        "8.7": 56.0,
+        "8.8": 56.5,
+        "8.9": 57.0,
+        "9.0": 57.5,
+        "9.1": 58.0,
+        "9.2": 58.5,
+        "9.3": 59.0,
+        "9.4": 59.5,
+        "9.5": 60.0,
+        "9.6": 60.5,
+        "9.7": 61.0,
+        "9.8": 61.5,
+        "9.9": 62.0,
+        "10.0": 62.5
+    },
+    "5.7": {
+        "8.5": 55.5,
+        "8.6": 56.0,
+        "8.7": 56.5,
+        "8.8": 57.0,
+        "8.9": 57.5,
+        "9.0": 58.0,
+        "9.1": 58.5,
+        "9.2": 59.0,
+        "9.3": 59.5,
+        "9.4": 60.0,
+        "9.5": 60.5,
+        "9.6": 61.0,
+        "9.7": 61.5,
+        "9.8": 62.0,
+        "9.9": 62.5,
+        "10.0": 63.0
+    },
+    "5.8": {
+        "8.5": 56.0,
+        "8.6": 56.5,
+        "8.7": 57.0,
+        "8.8": 57.5,
+        "8.9": 58.0,
+        "9.0": 58.5,
+        "9.1": 59.0,
+        "9.2": 59.5,
+        "9.3": 60.0,
+        "9.4": 60.5,
+        "9.5": 61.0,
+        "9.6": 61.5,
+        "9.7": 62.0,
+        "9.8": 62.5,
+        "9.9": 63.0,
+        "10.0": 63.5
+    },
+    "5.9": {
+        "8.5": 56.5,
+        "8.6": 57.0,
+        "8.7": 57.5,
+        "8.8": 58.0,
+        "8.9": 58.5,
+        "9.0": 59.0,
+        "9.1": 59.5,
+        "9.2": 60.0,
+        "9.3": 60.5,
+        "9.4": 61.0,
+        "9.5": 61.5,
+        "9.6": 62.0,
+        "9.7": 62.5,
+        "9.8": 63.0,
+        "9.9": 63.5,
+        "10.0": 64.0
+    },
+    "6.0": {
+        "8.5": 57.0,
+        "8.6": 57.5,
+        "8.7": 58.0,
+        "8.8": 58.5,
+        "8.9": 59.0,
+        "9.0": 59.5,
+        "9.1": 60.0,
+        "9.2": 60.5,
+        "9.3": 61.0,
+        "9.4": 61.5,
+        "9.5": 62.0,
+        "9.6": 62.5,
+        "9.7": 63.0,
+        "9.8": 63.5,
+        "9.9": 64.0,
+        "10.0": 64.5
+    },
+    "6.1": {
+        "8.5": 57.5,
+        "8.6": 58.0,
+        "8.7": 58.5,
+        "8.8": 59.0,
+        "8.9": 59.5,
+        "9.0": 60.0,
+        "9.1": 60.5,
+        "9.2": 61.0,
+        "9.3": 61.5,
+        "9.4": 62.0,
+        "9.5": 62.5,
+        "9.6": 63.0,
+        "9.7": 63.5,
+        "9.8": 64.0,
+        "9.9": 64.5,
+        "10.0": 65.0
+    },
+    "6.2": {
+        "8.5": 58.0,
+        "8.6": 58.5,
+        "8.7": 59.0,
+        "8.8": 59.5,
+        "8.9": 60.0,
+        "9.0": 60.5,
+        "9.1": 61.0,
+        "9.2": 61.5,
+        "9.3": 62.0,
+        "9.4": 62.5,
+        "9.5": 63.0,
+        "9.6": 63.5,
+        "9.7": 64.0,
+        "9.8": 64.5,
+        "9.9": 65.0,
+        "10.0": 65.5
+    },
+    "6.3": {
+        "8.5": 58.5,
+        "8.6": 59.0,
+        "8.7": 59.5,
+        "8.8": 60.0,
+        "8.9": 60.5,
+        "9.0": 61.0,
+        "9.1": 61.5,
+        "9.2": 62.0,
+        "9.3": 62.5,
+        "9.4": 63.0,
+        "9.5": 63.5,
+        "9.6": 64.0,
+        "9.7": 64.5,
+        "9.8": 65.0,
+        "9.9": 65.5,
+        "10.0": 66.0
+    },
+    "6.4": {
+        "8.5": 59.0,
+        "8.6": 59.5,
+        "8.7": 60.0,
+        "8.8": 60.5,
+        "8.9": 61.0,
+        "9.0": 61.5,
+        "9.1": 62.0,
+        "9.2": 62.5,
+        "9.3": 63.0,
+        "9.4": 63.5,
+        "9.5": 64.0,
+        "9.6": 64.5,
+        "9.7": 65.0,
+        "9.8": 65.5,
+        "9.9": 66.0,
+        "10.0": 66.5
+    },
+    "6.5": {
+        "8.5": 59.5,
+        "8.6": 60.0,
+        "8.7": 60.5,
+        "8.8": 61.0,
+        "8.9": 61.5,
+        "9.0": 62.0,
+        "9.1": 62.5,
+        "9.2": 63.0,
+        "9.3": 63.5,
+        "9.4": 64.0,
+        "9.5": 64.5,
+        "9.6": 65.0,
+        "9.7": 65.5,
+        "9.8": 66.0,
+        "9.9": 66.5,
+        "10.0": 67.0
+    },
+    "6.6": {
+        "8.5": 60.0,
+        "8.6": 60.5,
+        "8.7": 61.0,
+        "8.8": 61.5,
+        "8.9": 62.0,
+        "9.0": 62.5,
+        "9.1": 63.0,
+        "9.2": 63.5,
+        "9.3": 64.0,
+        "9.4": 64.5,
+        "9.5": 65.0,
+        "9.6": 65.5,
+        "9.7": 66.0,
+        "9.8": 66.5,
+        "9.9": 67.0,
+        "10.0": 67.5
+    },
+    "6.7": {
+        "8.5": 60.5,
+        "8.6": 61.0,
+        "8.7": 61.5,
+        "8.8": 62.0,
+        "8.9": 62.5,
+        "9.0": 63.0,
+        "9.1": 63.5,
+        "9.2": 64.0,
+        "9.3": 64.5,
+        "9.4": 65.0,
+        "9.5": 65.5,
+        "9.6": 66.0,
+        "9.7": 66.5,
+        "9.8": 67.0,
+        "9.9": 67.5,
+        "10.0": 68.0
+    },
+    "6.8": {
+        "8.5": 61.0,
+        "8.6": 61.5,
+        "8.7": 62.0,
+        "8.8": 62.5,
+        "8.9": 63.0,
+        "9.0": 63.5,
+        "9.1": 64.0,
+        "9.2": 64.5,
+        "9.3": 65.0,
+        "9.4": 65.5,
+        "9.5": 66.0,
+        "9.6": 66.5,
+        "9.7": 67.0,
+        "9.8": 67.5,
+        "9.9": 68.0,
+        "10.0": 68.5
+    },
+    "6.9": {
+        "8.5": 61.5,
+        "8.6": 62.0,
+        "8.7": 62.5,
+        "8.8": 63.0,
+        "8.9": 63.5,
+        "9.0": 64.0,
+        "9.1": 64.5,
+        "9.2": 65.0,
+        "9.3": 65.5,
+        "9.4": 66.0,
+        "9.5": 66.5,
+        "9.6": 67.0,
+        "9.7": 67.5,
+        "9.8": 68.0,
+        "9.9": 68.5,
+        "10.0": 69.0
+    },
+    "7.0": {
+        "8.5": 62.0,
+        "8.6": 62.5,
+        "8.7": 63.0,
+        "8.8": 63.5,
+        "8.9": 64.0,
+        "9.0": 64.5,
+        "9.1": 65.0,
+        "9.2": 65.5,
+        "9.3": 66.0,
+        "9.4": 66.5,
+        "9.5": 67.0,
+        "9.6": 67.5,
+        "9.7": 68.0,
+        "9.8": 68.5,
+        "9.9": 69.0,
+        "10.0": 69.5
+    },
+    "7.1": {
+        "8.5": 62.5,
+        "8.6": 63.0,
+        "8.7": 63.5,
+        "8.8": 64.0,
+        "8.9": 64.5,
+        "9.0": 65.0,
+        "9.1": 65.5,
+        "9.2": 66.0,
+        "9.3": 66.5,
+        "9.4": 67.0,
+        "9.5": 67.5,
+        "9.6": 68.0,
+        "9.7": 68.5,
+        "9.8": 69.0,
+        "9.9": 69.5,
+        "10.0": 70.0
+    },
+    "7.2": {
+        "8.5": 63.0,
+        "8.6": 63.5,
+        "8.7": 64.0,
+        "8.8": 64.5,
+        "8.9": 65.0,
+        "9.0": 65.5,
+        "9.1": 66.0,
+        "9.2": 66.5,
+        "9.3": 67.0,
+        "9.4": 67.5,
+        "9.5": 68.0,
+        "9.6": 68.5,
+        "9.7": 69.0,
+        "9.8": 69.5,
+        "9.9": 70.0,
+        "10.0": 70.5
+    },
+    "7.3": {
+        "8.5": 63.5,
+        "8.6": 64.0,
+        "8.7": 64.5,
+        "8.8": 65.0,
+        "8.9": 65.5,
+        "9.0": 66.0,
+        "9.1": 66.5,
+        "9.2": 67.0,
+        "9.3": 67.5,
+        "9.4": 68.0,
+        "9.5": 68.5,
+        "9.6": 69.0,
+        "9.7": 69.5,
+        "9.8": 70.0,
+        "9.9": 70.5,
+        "10.0": 71.0
+    },
+    "7.4": {
+        "8.5": 64.0,
+        "8.6": 64.5,
+        "8.7": 65.0,
+        "8.8": 65.5,
+        "8.9": 66.0,
+        "9.0": 66.5,
+        "9.1": 67.0,
+        "9.2": 67.5,
+        "9.3": 68.0,
+        "9.4": 68.5,
+        "9.5": 69.0,
+        "9.6": 69.5,
+        "9.7": 70.0,
+        "9.8": 70.5,
+        "9.9": 71.0,
+        "10.0": 71.5
+    },
+    "7.5": {
+        "8.5": 64.5,
+        "8.6": 65.0,
+        "8.7": 65.5,
+        "8.8": 66.0,
+        "8.9": 66.5,
+        "9.0": 67.0,
+        "9.1": 67.5,
+        "9.2": 68.0,
+        "9.3": 68.5,
+        "9.4": 69.0,
+        "9.5": 69.5,
+        "9.6": 70.0,
+        "9.7": 70.5,
+        "9.8": 71.0,
+        "9.9": 71.5,
+        "10.0": 72.0
+    },
+    "7.6": {
+        "8.5": 65.0,
+        "8.6": 65.5,
+        "8.7": 66.0,
+        "8.8": 66.5,
+        "8.9": 67.0,
+        "9.0": 67.5,
+        "9.1": 68.0,
+        "9.2": 68.5,
+        "9.3": 69.0,
+        "9.4": 69.5,
+        "9.5": 70.0,
+        "9.6": 70.5,
+        "9.7": 71.0,
+        "9.8": 71.5,
+        "9.9": 72.0,
+        "10.0": 72.5
+    },
+    "7.7": {
+        "8.5": 65.5,
+        "8.6": 66.0,
+        "8.7": 66.5,
+        "8.8": 67.0,
+        "8.9": 67.5,
+        "9.0": 68.0,
+        "9.1": 68.5,
+        "9.2": 69.0,
+        "9.3": 69.5,
+        "9.4": 70.0,
+        "9.5": 70.5,
+        "9.6": 71.0,
+        "9.7": 71.5,
+        "9.8": 72.0,
+        "9.9": 72.5,
+        "10.0": 73.0
+    },
+    "7.8": {
+        "8.5": 66.0,
+        "8.6": 66.5,
+        "8.7": 67.0,
+        "8.8": 67.5,
+        "8.9": 68.0,
+        "9.0": 68.5,
+        "9.1": 69.0,
+        "9.2": 69.5,
+        "9.3": 70.0,
+        "9.4": 70.5,
+        "9.5": 71.0,
+        "9.6": 71.5,
+        "9.7": 72.0,
+        "9.8": 72.5,
+        "9.9": 73.0,
+        "10.0": 73.5
+    },
+    "7.9": {
+        "8.5": 66.5,
+        "8.6": 67.0,
+        "8.7": 67.5,
+        "8.8": 68.0,
+        "8.9": 68.5,
+        "9.0": 69.0,
+        "9.1": 69.5,
+        "9.2": 70.0,
+        "9.3": 70.5,
+        "9.4": 71.0,
+        "9.5": 71.5,
+        "9.6": 72.0,
+        "9.7": 72.5,
+        "9.8": 73.0,
+        "9.9": 73.5,
+        "10.0": 74.0
+    },
+    "8.0": {
+        "8.5": 67.0,
+        "8.6": 67.5,
+        "8.7": 68.0,
+        "8.8": 68.5,
+        "8.9": 69.0,
+        "9.0": 69.5,
+        "9.1": 70.0,
+        "9.2": 70.5,
+        "9.3": 71.0,
+        "9.4": 71.5,
+        "9.5": 72.0,
+        "9.6": 72.5,
+        "9.7": 73.0,
+        "9.8": 73.5,
+        "9.9": 74.0,
+        "10.0": 74.5
+    },
+    "8.1": {
+        "8.5": 67.5,
+        "8.6": 68.0,
+        "8.7": 68.5,
+        "8.8": 69.0,
+        "8.9": 69.5,
+        "9.0": 70.0,
+        "9.1": 70.5,
+        "9.2": 71.0,
+        "9.3": 71.5,
+        "9.4": 72.0,
+        "9.5": 72.5,
+        "9.6": 73.0,
+        "9.7": 73.5,
+        "9.8": 74.0,
+        "9.9": 74.5,
+        "10.0": 75.0
+    },
+    "8.2": {
+        "8.5": 68.0,
+        "8.6": 68.5,
+        "8.7": 69.0,
+        "8.8": 69.5,
+        "8.9": 70.0,
+        "9.0": 70.5,
+        "9.1": 71.0,
+        "9.2": 71.5,
+        "9.3": 72.0,
+        "9.4": 72.5,
+        "9.5": 73.0,
+        "9.6": 73.5,
+        "9.7": 74.0,
+        "9.8": 74.5,
+        "9.9": 75.0,
+        "10.0": 75.5
+    },
+    "8.3": {
+        "8.5": 68.5,
+        "8.6": 69.0,
+        "8.7": 69.5,
+        "8.8": 70.0,
+        "8.9": 70.5,
+        "9.0": 71.0,
+        "9.1": 71.5,
+        "9.2": 72.0,
+        "9.3": 72.5,
+        "9.4": 73.0,
+        "9.5": 73.5,
+        "9.6": 74.0,
+        "9.7": 74.5,
+        "9.8": 75.0,
+        "9.9": 75.5,
+        "10.0": 76.0
+    },
+    "8.4": {
+        "8.5": 69.0,
+        "8.6": 69.5,
+        "8.7": 70.0,
+        "8.8": 70.5,
+        "8.9": 71.0,
+        "9.0": 71.5,
+        "9.1": 72.0,
+        "9.2": 72.5,
+        "9.3": 73.0,
+        "9.4": 73.5,
+        "9.5": 74.0,
+        "9.6": 74.5,
+        "9.7": 75.0,
+        "9.8": 75.5,
+        "9.9": 76.0,
+        "10.0": 76.5
+    },
+    "8.5": {
+        "8.5": 69.5,
+        "8.6": 70.0,
+        "8.7": 70.5,
+        "8.8": 71.0,
+        "8.9": 71.5,
+        "9.0": 72.0,
+        "9.1": 72.5,
+        "9.2": 73.0,
+        "9.3": 73.5,
+        "9.4": 74.0,
+        "9.5": 74.5,
+        "9.6": 75.0,
+        "9.7": 75.5,
+        "9.8": 76.0,
+        "9.9": 76.5,
+        "10.0": 77.0
+    },
+    "8.6": {
+        "8.5": 70.0,
+        "8.6": 70.5,
+        "8.7": 71.0,
+        "8.8": 71.5,
+        "8.9": 72.0,
+        "9.0": 72.5,
+        "9.1": 73.0,
+        "9.2": 73.5,
+        "9.3": 74.0,
+        "9.4": 74.5,
+        "9.5": 75.0,
+        "9.6": 75.5,
+        "9.7": 76.0,
+        "9.8": 76.5,
+        "9.9": 77.0,
+        "10.0": 77.5
+    },
+    "8.7": {
+        "8.5": 70.5,
+        "8.6": 71.0,
+        "8.7": 71.5,
+        "8.8": 72.0,
+        "8.9": 72.5,
+        "9.0": 73.0,
+        "9.1": 73.5,
+        "9.2": 74.0,
+        "9.3": 74.5,
+        "9.4": 75.0,
+        "9.5": 75.5,
+        "9.6": 76.0,
+        "9.7": 76.5,
+        "9.8": 77.0,
+        "9.9": 77.5,
+        "10.0": 78.0
+    },
+    "8.8": {
+        "8.5": 71.0,
+        "8.6": 71.5,
+        "8.7": 72.0,
+        "8.8": 72.5,
+        "8.9": 73.0,
+        "9.0": 73.5,
+        "9.1": 74.0,
+        "9.2": 74.5,
+        "9.3": 75.0,
+        "9.4": 75.5,
+        "9.5": 76.0,
+        "9.6": 76.5,
+        "9.7": 77.0,
+        "9.8": 77.5,
+        "9.9": 78.0,
+        "10.0": 78.5
+    },
+    "8.9": {
+        "8.5": 71.5,
+        "8.6": 72.0,
+        "8.7": 72.5,
+        "8.8": 73.0,
+        "8.9": 73.5,
+        "9.0": 74.0,
+        "9.1": 74.5,
+        "9.2": 75.0,
+        "9.3": 75.5,
+        "9.4": 76.0,
+        "9.5": 76.5,
+        "9.6": 77.0,
+        "9.7": 77.5,
+        "9.8": 78.0,
+        "9.9": 78.5,
+        "10.0": 79.0
+    },
+    "9.0": {
+        "8.5": 72.0,
+        "8.6": 72.5,
+        "8.7": 73.0,
+        "8.8": 73.5,
+        "8.9": 74.0,
+        "9.0": 74.5,
+        "9.1": 75.0,
+        "9.2": 75.5,
+        "9.3": 76.0,
+        "9.4": 76.5,
+        "9.5": 77.0,
+        "9.6": 77.5,
+        "9.7": 78.0,
+        "9.8": 78.5,
+        "9.9": 79.0,
+        "10.0": 79.5
+    }
 };
 
+// ================= RATE LOGIC =================
 
+// Change this single value to raise or lower all rates.
+// Positive = increase, negative = decrease. Examples: 1 = +1 rupee, -2 = -2 rupees, 0.5 = +50 paise
+const RATE_ADJUSTMENT = 1; // Currently +1 rupee
 
-/**
- * Looks up the rate based on Fat and SNF from the milkRateChart.
-/**
- * Looks up the rate based on Fat and SNF from the milkRateChart.
- * @param {number} fat - The Fat percentage.
- * @param {number} snf - The SNF percentage.
- * @returns {number} The rate per litre, or 0.00 if not found.
- */
-const RATE_ADJUSTMENT = 1; // Currently set to +1 rupee
-
+// Returns the rate, or null if FAT/SNF is not in the chart.
 function getRate(fat, snf) {
-    // FIX: Fat must be formatted to two decimal places (e.g., "5.50")
-    const fatKey = parseFloat(fat).toFixed(2); 
-    
-    // SNF must be formatted to one decimal place (e.g., "8.0")
-    const snfKey = parseFloat(snf).toFixed(1);
+    if (!isFinite(fat) || !isFinite(snf)) return null;
 
-    // Look up the rate: milkRateChart[fatKey][snfKey]
-    const rate = milkRateChart[fatKey] ? milkRateChart[fatKey][snfKey] : undefined;
+    // Only exact 0.1 steps are accepted (no silent rounding of values like 3.25)
+    const fatTenths = Math.round(fat * 10);
+    const snfTenths = Math.round(snf * 10);
+    if (Math.abs(fat * 10 - fatTenths) > 1e-6 || Math.abs(snf * 10 - snfTenths) > 1e-6) return null;
 
-    console.log(`Lookup: Fat Key = ${fatKey}, SNF Key = ${snfKey}, Rate = ${rate !== undefined ? rate + RATE_ADJUSTMENT : 0.00}`);
+    const fatKey = (fatTenths / 10).toFixed(1);
+    const snfKey = (snfTenths / 10).toFixed(1);
 
-    // Apply RATE_ADJUSTMENT on top of the base rate
-    return rate !== undefined ? rate + RATE_ADJUSTMENT : 0.00;
+    const baseRate = milkRateChart[fatKey] ? milkRateChart[fatKey][snfKey] : undefined;
+    if (baseRate === undefined) return null;
+
+    return Math.round((baseRate + RATE_ADJUSTMENT) * 100) / 100;
 }
 
-/**
- * Calculates the total amount for a row using the milk rate chart lookup.
- * @param {string} tableType - 'morning' or 'evening'.
- * @param {HTMLElement} element - The input element that was changed.
- */
-function calculateAmount(tableType, element) {
-    const row = element.parentElement.parentElement;
-    
-    // Get values from the respective inputs, ensuring proper fallback for parsing
-    const litres = parseFloat(row.querySelector(`.litres-${tableType}`)?.value || 0);
-    const fat = parseFloat(row.querySelector(`.fat-${tableType}`)?.value || 0);
-    const snf = parseFloat(row.querySelector(`.snf-${tableType}`)?.value || 0);
+function setInvalid(input, invalid) {
+    if (!input) return;
+    input.style.outline = invalid ? "2px solid red" : "";
+    input.title = invalid ? "FAT/SNF not in rate chart (FAT 5.0-9.0, SNF 8.5-10.0, steps of 0.1)" : "";
+}
 
-    // Look up the rate
-    const ratePerLitre = getRate(fat, snf); 
-    
-    // Calculate total amount
-    const totalAmount = (litres * ratePerLitre);
+function calculateAmount(type, element) {
+    const row = element.closest("tr");
+    const litresInput = row.querySelector(`.litres-${type}`);
+    const fatInput = row.querySelector(`.fat-${type}`);
+    const snfInput = row.querySelector(`.snf-${type}`);
 
-    // Update the Total Amount cell
-    row.querySelector(`.total-amount-${tableType}`).textContent = totalAmount.toFixed(2);
+    const litres = parseFloat(litresInput?.value) || 0;
+    let total = 0;
 
+    if (fatInput.value === "" && snfInput.value === "") {
+        setInvalid(fatInput, false);
+        setInvalid(snfInput, false);
+    } else {
+        const rate = getRate(parseFloat(fatInput.value), parseFloat(snfInput.value));
+        const invalid = rate === null;
+        setInvalid(fatInput, invalid);
+        setInvalid(snfInput, invalid);
+        if (!invalid) total = litres * rate;
+    }
+
+    row.querySelector(`.total-amount-${type}`).textContent = total.toFixed(2);
+    const rateCell = row.querySelector(`.rate-${type}`);
+    if (rateCell) rateCell.textContent = (litres > 0 && total > 0 ? total / litres : 0).toFixed(2);
     calculateTotals();
 }
 
-// Function to calculate totals (Only minor updates for the new Rate column)
-function calculateTotals() {
-    let totalLitresMorning = 0, totalAmountMorning = 0;
-    let totalLitresEvening = 0, totalAmountEvening = 0;
-
-    document.querySelectorAll("#morningTableBody tr").forEach(row => {
-        totalLitresMorning += parseFloat(row.querySelector(".litres-morning")?.value || 0);
-        // Note: Reads total amount from the display TD, not recalculating
-        totalAmountMorning += parseFloat(row.querySelector(".total-amount-morning")?.textContent || "0");
-    });
-
-    document.querySelectorAll("#eveningTableBody tr").forEach(row => {
-        totalLitresEvening += parseFloat(row.querySelector(".litres-evening")?.value || 0);
-        totalAmountEvening += parseFloat(row.querySelector(".total-amount-evening")?.textContent || "0");
-    });
-
-    document.getElementById("morningTotalLitres").textContent = totalLitresMorning.toFixed(2);
-    document.getElementById("morningTotalAmount").textContent = totalAmountMorning.toFixed(2);
-    document.getElementById("eveningTotalLitres").textContent = totalLitresEvening.toFixed(2);
-    document.getElementById("eveningTotalAmount").textContent = totalAmountEvening.toFixed(2);
-
-    document.getElementById("totalLitres").textContent = (totalLitresMorning + totalLitresEvening).toFixed(2);
-    document.getElementById("totalAmount").textContent = (totalAmountMorning + totalAmountEvening).toFixed(2);
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
 }
 
+function calculateTotals() {
+    const sums = {};
+
+    ["morning", "evening"].forEach(type => {
+        let litres = 0, amount = 0;
+        document.querySelectorAll(`#${type}TableBody tr`).forEach(row => {
+            litres += parseFloat(row.querySelector(`.litres-${type}`)?.value) || 0;
+            amount += parseFloat(row.querySelector(`.total-amount-${type}`)?.textContent) || 0;
+        });
+        sums[type] = { litres, amount };
+    });
+
+    setText("morningTotalLitres", sums.morning.litres.toFixed(2));
+    setText("morningTotalAmount", sums.morning.amount.toFixed(2));
+    setText("eveningTotalLitres", sums.evening.litres.toFixed(2));
+    setText("eveningTotalAmount", sums.evening.amount.toFixed(2));
+    setText("totalLitres", (sums.morning.litres + sums.evening.litres).toFixed(2));
+    setText("totalAmount", (sums.morning.amount + sums.evening.amount).toFixed(2));
+}
+
+// ---------- Arrow-key navigation ----------
 document.addEventListener("keydown", function (event) {
     const activeElement = document.activeElement;
+    if (!activeElement || activeElement.tagName !== "INPUT") return;
 
-    if (activeElement.tagName === "INPUT") {
-        let row = activeElement.closest("tr");
-        if (!row) return;  
-        
-        let table = row.closest("tbody");
-        if (!table) return; 
+    const row = activeElement.closest("tr");
+    if (!row) return;
+    const table = row.closest("tbody");
+    if (!table) return;
 
-        let inputs = Array.from(table.querySelectorAll("input"));
-        let index = inputs.indexOf(activeElement);
+    const inputs = Array.from(table.querySelectorAll("input"));
+    const index = inputs.indexOf(activeElement);
 
-        if (event.key === "ArrowRight" && index < inputs.length - 1) {
-            event.preventDefault(); // Prevent browser auto-fill
-            inputs[index + 1].focus();
-        } 
-        else if (event.key === "ArrowLeft" && index > 0) {
+    if (event.key === "ArrowRight" && index < inputs.length - 1) {
+        event.preventDefault();
+        inputs[index + 1].focus();
+    } else if (event.key === "ArrowLeft" && index > 0) {
+        event.preventDefault();
+        inputs[index - 1].focus();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        const cellIndex = activeElement.parentElement?.cellIndex;
+        if (cellIndex === undefined) return;
+        const otherRow = event.key === "ArrowDown" ? row.nextElementSibling : row.previousElementSibling;
+        const otherInput = otherRow?.children[cellIndex]?.querySelector("input");
+        if (otherInput) {
             event.preventDefault();
-            inputs[index - 1].focus();
-        } 
-        else if (event.key === "ArrowDown") {
-            let cellIndex = activeElement.parentElement?.cellIndex;
-            if (cellIndex !== undefined) {
-                let nextRow = row.nextElementSibling;
-                let nextInput = nextRow?.children[cellIndex]?.querySelector("input");
-                if (nextInput) {
-                    event.preventDefault();
-                    nextInput.focus();
-                }
-            }
-        } 
-        else if (event.key === "ArrowUp") {
-            let cellIndex = activeElement.parentElement?.cellIndex;
-            if (cellIndex !== undefined) {
-                let prevRow = row.previousElementSibling;
-                let prevInput = prevRow?.children[cellIndex]?.querySelector("input");
-                if (prevInput) {
-                    event.preventDefault();
-                    prevInput.focus();
-                }
-            }
+            otherInput.focus();
         }
     }
 });
+
+// Swap inputs for plain text while printing, then restore them afterwards
 function prepareForPrint() {
+    const swapped = [];
+
     document.querySelectorAll("input").forEach(input => {
         const span = document.createElement("span");
         span.textContent = input.value || "";
         span.style.display = "inline-block";
         input.parentNode.replaceChild(span, input);
+        swapped.push([span, input]);
     });
+
+    function restore() {
+        swapped.forEach(([span, input]) => {
+            if (span.parentNode) span.parentNode.replaceChild(input, span);
+        });
+        window.removeEventListener("afterprint", restore);
+    }
+    window.addEventListener("afterprint", restore);
+
     window.print();
 }
 
-
 function clearData() {
-    const elementsToClear = [
-        "billDate", "farmerName", "balance", 
-        "morningTotalLitres", "morningTotalAmount",
-        "eveningTotalLitres", "eveningTotalAmount",
-        "totalLitres", "totalAmount", "signature"
-    ];
+    if (!confirm("Clear all data?")) return;
 
-    // Clear input fields and displayed text
-    elementsToClear.forEach(id => {
-        const element = document.getElementById(id);
-        if (element) {
-            if (element.tagName === "INPUT") {
-                element.value = "";
-            } else {
-                element.textContent = "-"; // Set to default display
-            }
-        }
+    ["farmerName", "balance", "signature"].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") el.value = "";
+        else el.textContent = "-";
     });
 
-    // Clear all table data (both text content and inputs inside tables)
-    document.querySelectorAll("table tbody").forEach(tbody => tbody.innerHTML = "");
+    const billDate = document.getElementById("billDate");
+    if (billDate) billDate.value = todayLocal();
 
-    // Clear inputs inside tables (if tables use inputs for data entry)
-    document.querySelectorAll("table input").forEach(input => input.value = "");
-    
-    // Re-generate the table rows with the new structure
-    generatePreviousDates();
-
+    generatePreviousDates(); // rebuilds empty rows and resets all totals to 0.00
     alert("All data cleared successfully");
 }
 
-
-document.addEventListener("DOMContentLoaded", () => {
-    // Set today's date on load and generate table rows
-    document.getElementById("billDate").value = new Date().toISOString().substring(0, 10);
-    generatePreviousDates();
-
-    const darkModeToggle = document.createElement("button");
-    darkModeToggle.innerHTML = "🌙"; // Default icon as moon
-    darkModeToggle.classList.add("dark-mode-toggle");
-    document.body.appendChild(darkModeToggle);
-
-    if (localStorage.getItem("darkMode") === "enabled") {
-        document.body.classList.add("dark-mode");
-        darkModeToggle.innerHTML = "☀️"; // Change to sun
-    }
-
-    darkModeToggle.addEventListener("click", () => {
-        document.body.classList.toggle("dark-mode");
-        document.body.style.transition = "background-color 0.3s ease-in-out, color 0.3s ease-in-out";
-        
-        if (document.body.classList.contains("dark-mode")) {
-            localStorage.setItem("darkMode", "enabled");
-            darkModeToggle.innerHTML = "☀️";
-        } else {
-            localStorage.setItem("darkMode", "disabled");
-            darkModeToggle.innerHTML = "🌙";
-        }
-    });
-});
-// --- End of Updated scripts.js ---
+// --- End ---
