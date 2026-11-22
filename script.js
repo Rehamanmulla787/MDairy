@@ -1,10 +1,14 @@
-// --- scripts.js (fixed) ---
+// --- scripts.js (merged: cow milk chart + fixes + all original features) ---
+
+function todayLocal() {
+    const t = new Date();
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
 
 document.addEventListener("DOMContentLoaded", function () {
     // ---------- Farmer list ----------
     const farmerList = document.getElementById("farmerList");
     const farmers = ["Dashrath Salunke", "Anand Nandgavn", "Parasa Alas"];
-
     if (farmerList) {
         farmers.forEach(farmer => {
             const option = document.createElement("option");
@@ -15,7 +19,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // ---------- Bill date ----------
     const billDate = document.getElementById("billDate");
-    if (billDate) billDate.addEventListener("change", generatePreviousDates);
+    if (billDate) {
+        billDate.addEventListener("change", generatePreviousDates);
+        billDate.value = todayLocal(); // today's date on load
+    }
 
     // ---------- Recalculate while typing (one listener per table) ----------
     [["morningTableBody", "morning"], ["eveningTableBody", "evening"]].forEach(([id, type]) => {
@@ -24,6 +31,29 @@ document.addEventListener("DOMContentLoaded", function () {
         body.addEventListener("input", function (e) {
             if (e.target.matches("input")) calculateAmount(type, e.target);
         });
+    });
+
+    generatePreviousDates();
+
+    // ---------- Dark mode ----------
+    const darkModeToggle = document.createElement("button");
+    darkModeToggle.innerHTML = "🌙";
+    darkModeToggle.classList.add("dark-mode-toggle");
+    document.body.appendChild(darkModeToggle);
+
+    try {
+        if (localStorage.getItem("darkMode") === "enabled") {
+            document.body.classList.add("dark-mode");
+            darkModeToggle.innerHTML = "☀️";
+        }
+    } catch (e) { /* storage unavailable */ }
+
+    darkModeToggle.addEventListener("click", () => {
+        document.body.classList.toggle("dark-mode");
+        document.body.style.transition = "background-color 0.3s ease-in-out, color 0.3s ease-in-out";
+        const on = document.body.classList.contains("dark-mode");
+        darkModeToggle.innerHTML = on ? "☀️" : "🌙";
+        try { localStorage.setItem("darkMode", on ? "enabled" : "disabled"); } catch (e) { /* ignore */ }
     });
 });
 
@@ -60,6 +90,7 @@ function generatePreviousDates() {
                 <td><input type="number" class="input fat-${type}" min="0" step="0.1"></td>
                 <td><input type="number" class="input snf-${type}" min="0" step="0.1"></td>
                 <td class="total-amount-${type}">0.00</td>
+                <td class="rate-${type}" style="display:none">0.00</td>
             </tr>`;
             if (type === "morning") morningHtml += rowHtml;
             else eveningHtml += rowHtml;
@@ -391,7 +422,6 @@ function calculateAmount(type, element) {
     let total = 0;
 
     if (fatInput.value === "" && snfInput.value === "") {
-        // Nothing entered yet: no warning
         setInvalid(fatInput, false);
         setInvalid(snfInput, false);
     } else {
@@ -403,24 +433,66 @@ function calculateAmount(type, element) {
     }
 
     row.querySelector(`.total-amount-${type}`).textContent = total.toFixed(2);
+    const rateCell = row.querySelector(`.rate-${type}`);
+    if (rateCell) rateCell.textContent = (litres > 0 && total > 0 ? total / litres : 0).toFixed(2);
     calculateTotals();
 }
 
-function calculateTotals() {
-    let totalLitres = 0, totalAmount = 0;
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
 
-    ["morningTableBody", "eveningTableBody"].forEach(id => {
-        const body = document.getElementById(id);
-        if (!body) return;
-        body.querySelectorAll("tr").forEach(row => {
-            totalLitres += parseFloat(row.querySelector("input")?.value) || 0;
-            totalAmount += parseFloat(row.querySelector("td:last-child")?.textContent) || 0;
+function calculateTotals() {
+    const sums = {};
+
+    ["morning", "evening"].forEach(type => {
+        let litres = 0, amount = 0;
+        document.querySelectorAll(`#${type}TableBody tr`).forEach(row => {
+            litres += parseFloat(row.querySelector(`.litres-${type}`)?.value) || 0;
+            amount += parseFloat(row.querySelector(`.total-amount-${type}`)?.textContent) || 0;
         });
+        sums[type] = { litres, amount };
     });
 
-    document.getElementById("totalLitres").textContent = totalLitres.toFixed(2);
-    document.getElementById("totalAmount").textContent = totalAmount.toFixed(2);
+    setText("morningTotalLitres", sums.morning.litres.toFixed(2));
+    setText("morningTotalAmount", sums.morning.amount.toFixed(2));
+    setText("eveningTotalLitres", sums.evening.litres.toFixed(2));
+    setText("eveningTotalAmount", sums.evening.amount.toFixed(2));
+    setText("totalLitres", (sums.morning.litres + sums.evening.litres).toFixed(2));
+    setText("totalAmount", (sums.morning.amount + sums.evening.amount).toFixed(2));
 }
+
+// ---------- Arrow-key navigation ----------
+document.addEventListener("keydown", function (event) {
+    const activeElement = document.activeElement;
+    if (!activeElement || activeElement.tagName !== "INPUT") return;
+
+    const row = activeElement.closest("tr");
+    if (!row) return;
+    const table = row.closest("tbody");
+    if (!table) return;
+
+    const inputs = Array.from(table.querySelectorAll("input"));
+    const index = inputs.indexOf(activeElement);
+
+    if (event.key === "ArrowRight" && index < inputs.length - 1) {
+        event.preventDefault();
+        inputs[index + 1].focus();
+    } else if (event.key === "ArrowLeft" && index > 0) {
+        event.preventDefault();
+        inputs[index - 1].focus();
+    } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        const cellIndex = activeElement.parentElement?.cellIndex;
+        if (cellIndex === undefined) return;
+        const otherRow = event.key === "ArrowDown" ? row.nextElementSibling : row.previousElementSibling;
+        const otherInput = otherRow?.children[cellIndex]?.querySelector("input");
+        if (otherInput) {
+            event.preventDefault();
+            otherInput.focus();
+        }
+    }
+});
 
 // Swap inputs for plain text while printing, then restore them afterwards
 function prepareForPrint() {
@@ -443,6 +515,23 @@ function prepareForPrint() {
     window.addEventListener("afterprint", restore);
 
     window.print();
+}
+
+function clearData() {
+    if (!confirm("Clear all data?")) return;
+
+    ["farmerName", "balance", "signature"].forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") el.value = "";
+        else el.textContent = "-";
+    });
+
+    const billDate = document.getElementById("billDate");
+    if (billDate) billDate.value = todayLocal();
+
+    generatePreviousDates(); // rebuilds empty rows and resets all totals to 0.00
+    alert("All data cleared successfully");
 }
 
 // --- End ---
