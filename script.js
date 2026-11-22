@@ -1,13 +1,11 @@
-// --- Start of Corrected scripts.js ---
+// --- scripts.js (fixed) ---
 
 document.addEventListener("DOMContentLoaded", function () {
+    // ---------- Farmer list ----------
     const farmerList = document.getElementById("farmerList");
-    const farmerInput = document.getElementById("farmerName");
-
     const farmers = ["Dashrath Salunke", "Anand Nandgavn", "Parasa Alas"];
 
-    function loadFarmers() {
-        farmerList.innerHTML = "";
+    if (farmerList) {
         farmers.forEach(farmer => {
             const option = document.createElement("option");
             option.value = farmer;
@@ -15,65 +13,69 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    loadFarmers();
+    // ---------- Bill date ----------
+    const billDate = document.getElementById("billDate");
+    if (billDate) billDate.addEventListener("change", generatePreviousDates);
 
-    farmerInput.addEventListener("input", function () {
-        const inputValue = this.value.toLowerCase();
-        farmerList.innerHTML = "";
-
-        farmers.forEach(farmer => {
-            if (farmer.toLowerCase().includes(inputValue)) {
-                const option = document.createElement("option");
-                option.value = farmer;
-                farmerList.appendChild(option);
-            }
+    // ---------- Recalculate while typing (one listener per table) ----------
+    [["morningTableBody", "morning"], ["eveningTableBody", "evening"]].forEach(([id, type]) => {
+        const body = document.getElementById(id);
+        if (!body) return;
+        body.addEventListener("input", function (e) {
+            if (e.target.matches("input")) calculateAmount(type, e.target);
         });
     });
 });
 
-document.getElementById("billDate").addEventListener("change", generatePreviousDates);
-
 function generatePreviousDates() {
-    const selectedDate = new Date(document.getElementById("billDate").value);
     const morningTableBody = document.getElementById("morningTableBody");
     const eveningTableBody = document.getElementById("eveningTableBody");
+    const value = document.getElementById("billDate").value; // "YYYY-MM-DD"
 
-    morningTableBody.innerHTML = "";
-    eveningTableBody.innerHTML = "";
+    // Date cleared: empty the tables instead of showing "Invalid Date"
+    if (!value) {
+        morningTableBody.innerHTML = "";
+        eveningTableBody.innerHTML = "";
+        calculateTotals();
+        return;
+    }
 
-    const currentDate = new Date(selectedDate);
-    currentDate.setDate(currentDate.getDate() - 6);
+    // Parse parts manually to avoid UTC time zone shifts
+    const [y, m, d] = value.split("-").map(Number);
+    const currentDate = new Date(y, m - 1, d - 6);
 
-    const formattedOptions = { month: '2-digit', day: '2-digit' };
+    let morningHtml = "";
+    let eveningHtml = "";
 
     for (let i = 0; i < 7; i++) {
-        const formattedDate = currentDate.toLocaleDateString('en-GB', formattedOptions);
+        const dd = String(currentDate.getDate()).padStart(2, "0");
+        const mm = String(currentDate.getMonth() + 1).padStart(2, "0");
+        const formattedDate = `${dd}/${mm}`;
 
-        morningTableBody.innerHTML += `
+        ["morning", "evening"].forEach(type => {
+            const rowHtml = `
             <tr>
                 <td>${formattedDate}</td>
-                <td><input type="number" class="input litres-morning" onchange="calculateAmount('morning', this)"></td>
-                <td><input type="number" class="input fat-morning" onchange="calculateAmount('morning', this)"></td>
-                <td><input type="number" class="input snf-morning" onchange="calculateAmount('morning', this)"></td>
-                <td class="total-amount-morning">0.00</td>
+                <td><input type="number" class="input litres-${type}" min="0" step="0.01"></td>
+                <td><input type="number" class="input fat-${type}" min="0" step="0.1"></td>
+                <td><input type="number" class="input snf-${type}" min="0" step="0.1"></td>
+                <td class="total-amount-${type}">0.00</td>
             </tr>`;
-
-        eveningTableBody.innerHTML += `
-            <tr>
-                <td>${formattedDate}</td>
-                <td><input type="number" class="input litres-evening" onchange="calculateAmount('evening', this)"></td>
-                <td><input type="number" class="input fat-evening" onchange="calculateAmount('evening', this)"></td>
-                <td><input type="number" class="input snf-evening" onchange="calculateAmount('evening', this)"></td>
-                <td class="total-amount-evening">0.00</td>
-            </tr>`;
+            if (type === "morning") morningHtml += rowHtml;
+            else eveningHtml += rowHtml;
+        });
 
         currentDate.setDate(currentDate.getDate() + 1);
     }
+
+    morningTableBody.innerHTML = morningHtml;
+    eveningTableBody.innerHTML = eveningHtml;
+    calculateTotals(); // reset totals to match the new empty tables
 }
 
 // ================= RATE CHART =================
 
-const  cowmilkRateChart = {
+const cowmilkRateChart = {
     "3.0": {
         "8.0": 37.0,
         "8.1": 37.3,
@@ -349,56 +351,98 @@ const  cowmilkRateChart = {
     }
 };
 
-// 🔥 FUNCTION
-// ✅ RATE ADJUSTMENT — Change this single value to increase or decrease all rates
-// Positive = increase, Negative = decrease
-// Examples: 1 = +1 rupee, -2 = -2 rupees, 0.5 = +50 paise
-const RATE_ADJUSTMENT = 1; // Currently set to +1 rupee
+// ================= RATE LOGIC =================
 
+// Change this single value to raise or lower all rates.
+// Positive = increase, negative = decrease. Examples: 1 = +1 rupee, -2 = -2 rupees, 0.5 = +50 paise
+const RATE_ADJUSTMENT = 1; // Currently +1 rupee
+
+// Returns the rate, or null if FAT/SNF is not in the chart.
 function getRate(fat, snf) {
-    const fatKey = parseFloat(fat).toFixed(1);
-    const snfKey = parseFloat(snf).toFixed(1);
+    if (!isFinite(fat) || !isFinite(snf)) return null;
+
+    // Only exact 0.1 steps are accepted (no silent rounding of values like 3.25)
+    const fatTenths = Math.round(fat * 10);
+    const snfTenths = Math.round(snf * 10);
+    if (Math.abs(fat * 10 - fatTenths) > 1e-6 || Math.abs(snf * 10 - snfTenths) > 1e-6) return null;
+
+    const fatKey = (fatTenths / 10).toFixed(1);
+    const snfKey = (snfTenths / 10).toFixed(1);
 
     const baseRate = cowmilkRateChart[fatKey] ? cowmilkRateChart[fatKey][snfKey] : undefined;
+    if (baseRate === undefined) return null;
 
-    // Apply adjustment to whatever rate is found
-    return baseRate !== undefined ? baseRate + RATE_ADJUSTMENT : 0.00;
+    return Math.round((baseRate + RATE_ADJUSTMENT) * 100) / 100;
 }
-function prepareForPrint() {
-    document.querySelectorAll("input").forEach(input => {
-        const span = document.createElement("span");
-        span.textContent = input.value || "";
-        span.style.display = "inline-block";
-        input.parentNode.replaceChild(span, input);
-    });
-    window.print();
+
+function setInvalid(input, invalid) {
+    if (!input) return;
+    input.style.outline = invalid ? "2px solid red" : "";
+    input.title = invalid ? "FAT/SNF not in rate chart (FAT 3.0-5.0, SNF 8.0-9.0, steps of 0.1)" : "";
 }
 
 function calculateAmount(type, element) {
     const row = element.closest("tr");
+    const litresInput = row.querySelector(`.litres-${type}`);
+    const fatInput = row.querySelector(`.fat-${type}`);
+    const snfInput = row.querySelector(`.snf-${type}`);
 
-    const litres = parseFloat(row.querySelector(`.litres-${type}`)?.value || 0);
-    const fat = parseFloat(row.querySelector(`.fat-${type}`)?.value || 0);
-    const snf = parseFloat(row.querySelector(`.snf-${type}`)?.value || 0);
+    const litres = parseFloat(litresInput?.value) || 0;
+    let total = 0;
 
-    const rate = getRate(fat, snf);
-    const total = litres * rate;
+    if (fatInput.value === "" && snfInput.value === "") {
+        // Nothing entered yet: no warning
+        setInvalid(fatInput, false);
+        setInvalid(snfInput, false);
+    } else {
+        const rate = getRate(parseFloat(fatInput.value), parseFloat(snfInput.value));
+        const invalid = rate === null;
+        setInvalid(fatInput, invalid);
+        setInvalid(snfInput, invalid);
+        if (!invalid) total = litres * rate;
+    }
 
     row.querySelector(`.total-amount-${type}`).textContent = total.toFixed(2);
-
     calculateTotals();
 }
 
 function calculateTotals() {
     let totalLitres = 0, totalAmount = 0;
 
-    document.querySelectorAll("tbody tr").forEach(row => {
-        totalLitres += parseFloat(row.querySelector("input")?.value || 0);
-        totalAmount += parseFloat(row.querySelector("td:last-child")?.textContent || 0);
+    ["morningTableBody", "eveningTableBody"].forEach(id => {
+        const body = document.getElementById(id);
+        if (!body) return;
+        body.querySelectorAll("tr").forEach(row => {
+            totalLitres += parseFloat(row.querySelector("input")?.value) || 0;
+            totalAmount += parseFloat(row.querySelector("td:last-child")?.textContent) || 0;
+        });
     });
 
     document.getElementById("totalLitres").textContent = totalLitres.toFixed(2);
     document.getElementById("totalAmount").textContent = totalAmount.toFixed(2);
+}
+
+// Swap inputs for plain text while printing, then restore them afterwards
+function prepareForPrint() {
+    const swapped = [];
+
+    document.querySelectorAll("input").forEach(input => {
+        const span = document.createElement("span");
+        span.textContent = input.value || "";
+        span.style.display = "inline-block";
+        input.parentNode.replaceChild(span, input);
+        swapped.push([span, input]);
+    });
+
+    function restore() {
+        swapped.forEach(([span, input]) => {
+            if (span.parentNode) span.parentNode.replaceChild(input, span);
+        });
+        window.removeEventListener("afterprint", restore);
+    }
+    window.addEventListener("afterprint", restore);
+
+    window.print();
 }
 
 // --- End ---
