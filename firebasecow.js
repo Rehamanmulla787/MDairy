@@ -25,6 +25,7 @@ async function saveData() {
 
     if (!billDate || !farmerName) {
         alert("Please enter both Bill Date and Farmer Name before saving.");
+        document.getElementById("loader").style.display = "none";
         return;
     }
 
@@ -102,7 +103,7 @@ async function fetchSavedData() {
 
     document.getElementById("loader").style.display = "block";
 
-    const farmerRef = doc(collection(db, "cow-milk-data"), farmerName);
+    const farmerRef = doc(collection(db, "milk-data"), farmerName);
     const dateRef = doc(collection(farmerRef, "date"), billDate);
 
     try {
@@ -110,7 +111,7 @@ async function fetchSavedData() {
         if (docSnap.exists()) {
             const data = docSnap.data();
 
-            document.getElementById("balance").value = data.balance;
+            document.getElementById("balance").value = data.balance ?? "";
             document.getElementById("morningTotalLitres").textContent = data.totalMorningLitres.toFixed(2);
             document.getElementById("morningTotalAmount").textContent = data.totalMorningAmount.toFixed(2);
             document.getElementById("eveningTotalLitres").textContent = data.totalEveningLitres.toFixed(2);
@@ -124,7 +125,7 @@ async function fetchSavedData() {
                     row.querySelector(".litres-morning").value = data.morning[index].litres;
                     row.querySelector(".fat-morning").value = data.morning[index].fat;
                     row.querySelector(".snf-morning").value = data.morning[index].snf;
-                    row.querySelector(".rate-morning").textContent = data.morning[index].rate.toFixed(2); // NEW: Populate Rate
+                    row.querySelector(".rate-morning").textContent = (data.morning[index].rate || 0).toFixed(2); // NEW: Populate Rate
                     row.querySelector(".total-amount-morning").textContent = data.morning[index].totalAmount.toFixed(2);
                 }
             });
@@ -135,7 +136,7 @@ async function fetchSavedData() {
                     row.querySelector(".litres-evening").value = data.evening[index].litres;
                     row.querySelector(".fat-evening").value = data.evening[index].fat;
                     row.querySelector(".snf-evening").value = data.evening[index].snf;
-                    row.querySelector(".rate-evening").textContent = data.evening[index].rate.toFixed(2); // NEW: Populate Rate
+                    row.querySelector(".rate-evening").textContent = (data.evening[index].rate || 0).toFixed(2); // NEW: Populate Rate
                     row.querySelector(".total-amount-evening").textContent = data.evening[index].totalAmount.toFixed(2);
                 }
             });
